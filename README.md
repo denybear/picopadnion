@@ -1,2 +1,2 @@
-# picovation
-Controlling a Novation Circuit groovebox from a raspberry pico-based foot pedal.
+# picopadnion
+Controlling a Novation Launchpad mini from a raspberry pico and create musical accompaniment from it for a live band.
