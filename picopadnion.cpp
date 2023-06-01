@@ -54,9 +54,29 @@
 const uint NO_LED_GPIO = 255;
 const uint NO_LED2_GPIO = 255;
 
+// type definition
+struct songstep {
+	int step_number;					// current step number
+	int number_of_steps;				// number of steps in the song
+	int number_of_channels;				// number of channels in the song
+	uint16_t notes [CHANNEL_COUNT];		// channel data (ie. notes) for that step
+	uint8_t pad_number;					// pad number on the MIDI control surface
+	uint8_t pad_color;					// pad color on the MIDI control surface
+};
+
 // globals
 static uint8_t midi_dev_addr = 0;
 static bool connected = false;
+static int song_num = 0;			// by default, song number is 000
+static struct songstep cur_step;	// contains data for currently played step of the song
+static struct songstep next_step;	// contains data for next step that should be played in the song
+static int next_step_number = 0;	// number of next step in the song
+
+static bool load = false;			// state functions that are used to determine what to do
+static bool reset_position = false;
+static bool pad_pressed = false;
+static bool pad_released = false;
+
 
 // midi buffers
 #define MIDI_BUF_SIZE	500
@@ -64,11 +84,9 @@ static uint8_t midi_rx [MIDI_BUF_SIZE];		// large midi buffer to avoid override 
 static uint8_t midi_tx [MIDI_BUF_SIZE];		// large midi buffer to avoid override when receiving midi
 static int index_tx = 0;					// number of bytes to be sent
 
-
+// channels definition
 using namespace synth;
-
 synth::AudioChannel synth::channels[CHANNEL_COUNT];
-
 
 // 0: melody
 // 1: rhythm
@@ -83,6 +101,7 @@ const uint16_t instruments[NB_INSTRUMENTS][6] = {
 	Waveform::NOISE, 5, 5, 8000, 40, 8000,
 	Waveform::SQUARE, 10, 100, 0, 500, 12000
 };
+
 
 
 // poll USB receive and process received bytes accordingly
@@ -112,6 +131,169 @@ void send_midi (uint8_t * buffer, uint32_t lg)
 }
 
 
+// reset launchpad leds
+void reset_launchpad ()
+{
+	// basically we just add the right midi command to outgoing midi flow
+	midi_tx [index_tx++] = 0xB0;
+	midi_tx [index_tx++] = 0xB0;
+	midi_tx [index_tx++] = 0xB0;
+}
+
+// reset launchpad led to its original color for a given step 
+void reset_led (static struct songstep* step)
+{
+	// basically we just add the right midi command to outgoing midi flow
+	// this is NOTE ON (pad number) (pad color)
+	midi_tx [index_tx++] = 0x90;
+	midi_tx [index_tx++] = step->pad_number;
+	midi_tx [index_tx++] = step->pad_color;
+}
+
+// set launchpad led to a nice green color for a given step 
+void set_green_led (static struct songstep* step)
+{
+	// basically we just add the right midi command to outgoing midi flow
+	// this is NOTE ON (pad number) (pad color)
+	midi_tx [index_tx++] = 0x90;
+	midi_tx [index_tx++] = step->pad_number;
+	midi_tx [index_tx++] = 0x90;
+}
+
+
+// get step data from the song and fill the step structure accordingly
+// num is the song number, position is the step number
+// returns true if step data is OK, false otherwise
+bool get_step (int num, int position, struct songstep* step)
+{
+int pointer;
+int i;
+
+
+	// check if song exists by checking that song number is lower than number of songs
+	if (num >= song [0]) return false;
+
+	// get pointer to song data
+	pointer = song [1+num];
+
+	// get number of channels and steps
+	step->number_of_channels = song [pointer++];
+	step->number_of_steps = song [pointer++];
+
+	// no need to load instruments of the song to the channels, this is done when loading a song
+	// this could be done only once at song loading
+	pointer += step->number_of_channels;
+
+	// determine if we are still within the song; if not, return false
+	if (position >= step->number_of_steps) return false;
+
+	// update pointer so it points to step data
+	pointer = pointer + (position * (step->number_of_channels + 2)));	// nb_chan + 2 as we need to skip pad number and color
+
+	// get song data (at position) and load structure with it
+	// make sure we are not at the end of the song
+	for (i = 0; i < step->number_of_channels; i++) {
+		step->notes [i] = song [pointer];
+		if (step->notes [i] == 0xFFFF) return false;
+		pointer++;							// next position in song file
+	}
+
+	// fill pad number and pad color, and obviously step number
+	step->pad_number = song [pointer++];
+	step->pad_color = song [pointer];
+	step->step_number = position;
+
+	return true;
+}
+
+
+// get step data from a pad number pressed and fill the step structure accordingly
+// num is the song number, start_from is the step number from which we want to start checking the data
+// pad is the pressed pad number, for which we want the data
+// returns true if step data is OK, false otherwise (for exemple : no data for this pad number)
+bool get_step_from_pad_number (int num, int start_from, int pad, struct songstep* step)
+{
+struct songstep temp; 					// temporary structure to store step data for the song
+int i;
+int nbstep;
+
+	// get step 0 data for the song to get total number of steps in the song
+	if (get_step (num, 0, &temp) == false) return false;
+	nbstep = temp.number_of_steps;			// total number of steps in the song
+
+	// we start searching at (start_from) position then do a ring lookup.
+	// This allows to have step information that is the closest to the step actually being played (otherwise, the found found pad would be returned)
+	if (start_from > nbstep) return false;						// start_from out of boundaries
+	
+	
+	// we now have the total number of steps in the song; go through each to determine if one of the steps corresponds to the pressed pad
+	// from start_from to end of the song
+	for (i = start_from; i < nbstep; i++) {
+		if (get_step (num, i, &temp) == false) return false;	// in case we reached the end of the song or song file is inconsistent
+		if (pad == temp.pad_number) {							// we have found the step corresponding to the pressed pad
+			memcpy (step, &temp, sizeof (struct songstep));		// copy step data into destination passed as argument
+			return true;
+		}
+	}
+
+	// we now have the total number of steps in the song; go through each to determine if one of the steps corresponds to the pressed pad
+	// from beginning to start_from
+	for (i = 0; i < start_from; i++) {
+		if (get_step (num, i, &temp) == false) return false;	// in case we reached the end of the song or song file is inconsistent
+		if (pad == temp.pad_number) {							// we have found the step corresponding to the pressed pad
+			memcpy (step, &temp, sizeof (struct songstep));		// copy step data into destination passed as argument
+			return true;
+		}
+	}
+
+	return false;	// we went through all the song, we didn't find any step corresponding to the pressed pad
+}
+
+
+// plays the notes contained in songstep structure
+void update_playback (struct songstep* step) {
+
+int pointer;
+int nb_chan;
+int nb_step;
+int i;
+uint16_t freq;
+
+	// get notes data from the structure, and pass it to synthetizer
+	for (i = 0; i < step->number_of_channels; i++) {
+		channels[i].frequency = step->notes [i];
+		channels[i].trigger_attack();
+	}
+}
+
+
+// release all active channels for a song
+void stop_playback (void) {
+
+  // we must update the playback with release on all channels
+
+	for(uint8_t i = 0; i < CHANNEL_COUNT; i++) {
+    	// if channel is in OFF state, then do nothing
+    	// if channel is already in release state, then do nothing
+    	// if channel is in another state, then go to release state
+    	if ((channels[i].adsr_phase != ADSRPhase::OFF) && (channels[i].adsr_phase != ADSRPhase::RELEASE)) {
+			channels[i].trigger_release();
+		}
+	}
+}
+
+
+// shut down all the channels
+void reset_playback (void) {
+
+	// we must stop all channels
+	for(uint8_t i = 0; i < CHANNEL_COUNT; i++) {
+		channels[i].off();
+	}
+}
+
+
+
 // load an instrument of a song into a channel
 bool load_instrument(int instr, int chan) {
 
@@ -128,71 +310,6 @@ bool load_instrument(int instr, int chan) {
 	channels[chan].volume      = instruments [instr][5];
   
 	return true;
-}
-
-
-// get new data from the song, and plays the notes
-// num is the song number, position is the step number
-bool update_playback(int num, int position) {
-
-int pointer;
-int nb_chan;
-int nb_step;
-int i;
-uint16_t freq;
-
-	// check if song exists by checking that song number is lower than number of songs
-	if (num >= song [0]) return false;
-
-	// get pointer to song data
-	pointer = song [1+num];
-
-	// get number of channels and steps
-	nb_chan = song [pointer++];
-	nb_step = song [pointer++];
-
-	// no need to load instruments of the song to the channels, this is done when loading a song
-	// this could be done only once at song loading
-	pointer += nb_chan;
-
-	// determine if we are still within the song; if not, return false
-	if (position >= nb_step) return false;
-	// get song data (at position) and load corresponding channels with it
-	// make sure we are not at the end of the song
-	for (i=0; i<nb_chan; i++) {
-		freq = song [pointer + (position * (nb_chan + 2)) + i];		// nb_chan + 2 as we need to skip pad number and color
-		if (freq == 0xFFFF) return false;
-		channels[i].frequency = freq;
-		channels[i].trigger_attack();
-	}
-	
-	return true;
-}
-
-
-// release all active channels for a song
-void stop_playback(void) {
-
-  // we must update the playback with release on all channels
-
-	for(uint8_t i = 0; i < CHANNEL_COUNT; i++) {
-    	// if channel is in OFF state, then do nothing
-    	// if channel is already in release state, then do nothing
-    	// if channel is in another state, then go to release state
-    	if ((channels[i].adsr_phase != ADSRPhase::OFF) && (channels[i].adsr_phase != ADSRPhase::RELEASE)) {
-			channels[i].trigger_release();
-		}
-	}
-}
-
-
-// shut down all the channels
-void reset_playback(void) {
-
-	// we must stop all channels
-	for(uint8_t i = 0; i < CHANNEL_COUNT; i++) {
-		channels[i].off();
-	}
 }
 
 
@@ -228,15 +345,17 @@ int i;
 
 
 int main() {
+// MISSING: LOAD FCT
+// SET POSITION TO 0 IN THE SONG
 
-	int position = 0;
-	int song_num = 0;	// by default, song number is 000
+
 	int number_of_songs;
-
+	
 
 	stdio_init_all();
 	board_init();
 	printf("Picopadnion\r\n");
+	sleep_ms (2000);	// 2 sec wait to make sure launchpad is awake properly
 
 	// configure USB host
 	tusb_init();
@@ -245,8 +364,24 @@ int main() {
 	struct audio_buffer_pool *ap = init_audio(synth::sample_rate, PICO_AUDIO_PACK_I2S_DATA, PICO_AUDIO_PACK_I2S_BCLK);
 
 
+//HERE
+
+	// load song 000 by default
+	number_of_songs = song [0];
+	load_song (song_num);
+
+	// should be done in load song...?..
+	// initialize next step that should be played in the song
+	get_step (song_num, next_step_number, &next_step);
+	reset_playback ();			// stop any sound, just in case
+	// clear launchpad leds
+	reset_launchpad ();
+	
+	
+
+
 	// main loop
-	while (1) {
+	while (true) {
 
 		tuh_task();
 		// check connection to USB slave
@@ -310,6 +445,7 @@ void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
 	uint8_t *buffer;
 	uint32_t i;
 	uint32_t bytes_read;
+	struct songstep temp_step;
 
 	// set midi_rx as buffer
 	buffer = midi_rx;
@@ -324,29 +460,45 @@ void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
 				if (cable_num == 0) {
 					i = 0;
 					while (i < bytes_read) {
-						// test values received from groovebox via MIDI
-						switch (buffer [i]) {
-// This part is not needed as we don't receive MIDI CLOCK signals (R-PICO cannot cope with the speed)
-//							case MIDI_CLOCK:
-//								midi_tx [index_tx++] = MIDI_CLOCK;
-//								break;
-							case MIDI_CONTINUE:
-//								pause = true;
-								break;
-							case MIDI_PLAY:
-//								play = true;
-								break;
-							case MIDI_STOP:
-//								play = false;
-//								pause = false;
-								break;
-							case MIDI_PRG_CHANGE:
-//								if (buffer [i+1] <= 31) song = buffer [i+1];		// make sure song number is inside boudaries (0 to 31)
-								break;
-						}
+						// test values received from midi surface control via MIDI protocol
 						switch (buffer [i] & 0xF0) {	// control only most significant nibble to increment index in buffer; event sorting is approximative, but should be enough
-							case 0x80:
-							case 0x90:
+							case 0x80:	//note off
+								// if pad release is the same number as the last pad that was pressed, then sound off
+								// else do nothing
+								i+=3;
+								break;
+							case 0x90:	// note on
+								// Would it be useful to put this in the main loop rather than in this callback ?
+								
+								// determine if the pressed pad is assigned to a step, and which step
+								if (get_step_from_pad_number (song_num, next_step_number, buffer [i+1], &temp_step)) {
+									// we have pressed a pad that is assigned to a step
+									if (temp_step.pad_number == next_step.pad_number) {
+										// we have pressed the "next step" pad
+
+										// "next step" pad is becoming the pressed pad: fill pad structure
+										// this is required as pad number (which represents a chord) could be in many places in the song
+										// get_step_from_pad_number() always returns the 1st step where pad number as been found in the song
+										// but position in the song (next step) might not be at beginning of the song... it might be anywhere
+										// for example, you could be at verse 3, but get_step_from_pad_number() would return you are at verse 1.
+										// By doing this, we re-sync the playing position in the song to what it should be 
+										memcpy (&temp_step, &next_step, sizeof (struct songstep));
+										
+										// color of "next step" pad shall be set back to normal
+										// determine next step in the song
+										// load next step structure
+										// set led color of next step in a nice green
+									}
+									// stop previous sound : do we need to do this? need to check:
+									// 1- whether playing new sound stops previous sound
+									// 2- whether having 0 as sound frequency stops sound in the current channel
+									
+									// play new sound
+									// pressed pad is becoming the current pad: fill pad structure
+									memcpy (&cur_step, &temp_step, sizeof (struct songstep));
+								}
+								i+=3;
+								break;
 							case 0xA0:
 							case 0xB0:
 							case 0xE0:
