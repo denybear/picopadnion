@@ -139,7 +139,7 @@ void reset_launchpad ()
 }
 
 // reset launchpad led to its original color for a given step 
-void reset_led (static struct songstep* step)
+void reset_led (struct songstep* step)
 {
 	// basically we just add the right midi command to outgoing midi flow
 	// this is NOTE ON (pad number) (pad color)
@@ -149,7 +149,7 @@ void reset_led (static struct songstep* step)
 }
 
 // set launchpad led to a nice green color for a given step 
-void set_green_led (static struct songstep* step)
+void set_green_led (struct songstep* step)
 {
 	// basically we just add the right midi command to outgoing midi flow
 	// this is NOTE ON (pad number) (pad color)
@@ -186,7 +186,7 @@ int i;
 	if (position >= step->number_of_steps) return false;
 
 	// update pointer so it points to step data
-	pointer = pointer + (position * (step->number_of_channels + 2)));	// nb_chan + 2 as we need to skip pad number and color
+	pointer = pointer + (position * (step->number_of_channels + 2));	// nb_chan + 2 as we need to skip pad number and color
 
 	// get song data (at position) and load structure with it
 	// make sure we are not at the end of the song
@@ -251,11 +251,7 @@ int nbstep;
 // plays the notes contained in songstep structure
 void update_playback (struct songstep* step) {
 
-int pointer;
-int nb_chan;
-int nb_step;
 int i;
-uint16_t freq;
 
 	// get notes data from the structure, and pass it to synthetizer
 	for (i = 0; i < step->number_of_channels; i++) {
@@ -334,7 +330,7 @@ struct songstep temp_step;
 	// get number of channels and steps
 	nb_chan = song [pointer++];
 	// get number of steps
-	nb_step = song (pointer++];
+	nb_step = song [pointer++];
 
 	// load instruments of the song to the corresponding channel
 	for (i = 0; i < nb_chan; i++) {
@@ -344,7 +340,7 @@ struct songstep temp_step;
 	// go through each step and light the corresponding pad
 	for (i = 0; i < nb_step; i++) {
 		if (get_step (num, i, &temp_step) == false) return false;
-		reset_led (&temp_step)
+		reset_led (&temp_step);
 	}
 
 	// initialize next step that should be played in the song
@@ -362,6 +358,10 @@ int main() {
 // MISSING: LOAD FCT
 // SET POSITION TO 0 IN THE SONG
 // test du retour des appels à load song, get_step : si false, ne pas jouer de son...
+// stop previous sound : do we need to do this? need to check:
+// 1- whether playing new sound stops previous sound
+// 2- whether having 0 as sound frequency stops sound in the current channel
+
 
 	int number_of_songs;
 	
@@ -369,7 +369,7 @@ int main() {
 	stdio_init_all();
 	board_init();
 	printf("Picopadnion\r\n");
-	sleep_ms (2000);	// 2 sec wait to make sure launchpad is awake properly
+	sleep_ms (3000);	// 3 sec wait to make sure launchpad is awake properly
 
 	// configure USB host
 	tusb_init();
@@ -474,32 +474,40 @@ void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
 								break;
 							case 0x90:	// note on
 								// Would it be useful to put this in the main loop rather than in this callback ?
-								
-								// determine if the pressed pad is assigned to a step, and which step; we start checking the pads from next_step_number
-								// to make sure we don't miss the next step
-								if (get_step_from_pad_number (song_num, next_step_number, buffer [i+1], &temp_step)) {
-									// we have pressed a pad that is assigned to a step
-									if (temp_step.pad_number == next_step.pad_number) {
-										// we have pressed the "next step" pad; for safety, copy "next step" values in "temp" 
-										memcpy (&temp_step, &next_step, sizeof (struct songstep));
-										// color of "next step" pad shall be set back to normal
-										reset_led (&temp_step)
-										// determine next step in the song
-										if (++next_step_number >= temp_step.number_of_steps) next_step_number = 0;
-										// load new next step structure
-										get_step (song_num, next_step_number, &next_step);
-										// set led color of next step in a nice green
-										set_green_led (&next_step);
-									}
-//HERE
-									// stop previous sound : do we need to do this? need to check:
-									// 1- whether playing new sound stops previous sound
-									// 2- whether having 0 as sound frequency stops sound in the current channel
 
-									// pressed pad is becoming the current pad: fill pad structure
-									memcpy (&cur_step, &temp_step, sizeof (struct songstep));
-									// play new sound
-									update_playback (&cur_step);
+								// test velocity : if velocity is 0, then pad is released on the launchpad
+								if (buffer[i+2] == 0) {
+									// if pad release is the same number as the last pad that was pressed, then sound off
+									if (buffer [i+1] == cur_step.pad_number) stop_playback ();
+								}
+								// else velocity is 0x7F: pad is pressed on launchpad
+								else {
+									// determine if the pressed pad is assigned to a step, and which step; we start checking the pads from next_step_number
+									// to make sure we don't miss the next step
+									if (get_step_from_pad_number (song_num, next_step_number, buffer [i+1], &temp_step)) {
+										// we have pressed a pad that is assigned to a step
+										if (temp_step.pad_number == next_step.pad_number) {
+											// we have pressed the "next step" pad; for safety, copy "next step" values in "temp" 
+											memcpy (&temp_step, &next_step, sizeof (struct songstep));
+											// color of "next step" pad shall be set back to normal
+											reset_led (&temp_step);
+											// determine next step in the song
+											if (++next_step_number >= temp_step.number_of_steps) next_step_number = 0;
+											// load new next step structure
+											get_step (song_num, next_step_number, &next_step);
+											// set led color of next step in a nice green
+											set_green_led (&next_step);
+										}
+//HERE
+										// stop previous sound : do we need to do this? need to check:
+										// 1- whether playing new sound stops previous sound
+										// 2- whether having 0 as sound frequency stops sound in the current channel
+
+										// pressed pad is becoming the current pad: fill pad structure
+										memcpy (&cur_step, &temp_step, sizeof (struct songstep));
+										// play new sound
+										update_playback (&cur_step);
+									}
 								}
 								i+=3;
 								break;
