@@ -138,8 +138,26 @@ void reset_launchpad ()
 	midi_tx [index_tx++] = 0x00;
 }
 
-// reset launchpad led to its original color for a given step 
-void reset_led (struct songstep* step)
+
+// reset all launchpad leds 
+void reset_leds ()
+{
+int i, j;
+
+	for (i = 0; i < 0x80; i+= 0x10) {
+		for (j = 0; j < 0x08 ; j++) {
+			// basically we just add the right midi command to outgoing midi flow
+			// this is NOTE ON (pad number) (pad color)
+			midi_tx [index_tx++] = 0x90;
+			midi_tx [index_tx++] = (i + j);
+			midi_tx [index_tx++] = 0x0C;	// led off
+		}
+	}
+}
+
+
+// set launchpad led to its original color for a given step 
+void set_led (struct songstep* step)
 {
 	// basically we just add the right midi command to outgoing midi flow
 	// this is NOTE ON (pad number) (pad color)
@@ -147,6 +165,7 @@ void reset_led (struct songstep* step)
 	midi_tx [index_tx++] = step->pad_number;
 	midi_tx [index_tx++] = step->pad_color;
 }
+
 
 // set launchpad led to a nice green color for a given step 
 void set_green_led (struct songstep* step)
@@ -262,11 +281,11 @@ int i;
 
 
 // release all active channels for a song
-void stop_playback (void) {
+void stop_playback () {
 
   // we must update the playback with release on all channels
 
-	for(uint8_t i = 0; i < CHANNEL_COUNT; i++) {
+	for (uint8_t i = 0; i < CHANNEL_COUNT; i++) {
     	// if channel is in OFF state, then do nothing
     	// if channel is already in release state, then do nothing
     	// if channel is in another state, then go to release state
@@ -278,14 +297,13 @@ void stop_playback (void) {
 
 
 // shut down all the channels
-void reset_playback (void) {
+void reset_playback () {
 
 	// we must stop all channels
-	for(uint8_t i = 0; i < CHANNEL_COUNT; i++) {
-		channels[i].off();
+	for (uint8_t i = 0; i < CHANNEL_COUNT; i++) {
+		channels[i].off ();
 	}
 }
-
 
 
 // load an instrument of a song into a channel
@@ -307,6 +325,19 @@ bool load_instrument(int instr, int chan) {
 }
 
 
+// reset position in the song to step 0 (start)
+// returns false if an issue has occured
+bool reset_position () {
+{
+	// initialize next step that should be played in the song to 0
+	// copy also to current step for safety
+	next_step_number = 0;
+	if (get_step (song_num, 0, &next_step) == false) return false;
+	memcpy (&cur_step, &next_step, sizeof (struct songstep));
+	return true;
+}
+
+
 // load song with number NUM
 bool load_song (int num) {
 
@@ -322,7 +353,7 @@ struct songstep temp_step;
 	// make sure all channels are off
 	reset_playback ();
 	// clear launchpad leds
-	reset_launchpad ();
+	reset_leds ();
 
 	// get pointer to song data
 	pointer = song [1+num];
@@ -340,27 +371,40 @@ struct songstep temp_step;
 	// go through each step and light the corresponding pad
 	for (i = 0; i < nb_step; i++) {
 		if (get_step (num, i, &temp_step) == false) return false;
-		reset_led (&temp_step);
+		set_led (&temp_step);
 	}
 
-	// initialize next step that should be played in the song
-	// copy also to current step for safety
-	next_step_number = 0;
-	if (get_step (song_num, 0, &next_step) == false) return false;
-	memcpy (&cur_step, &next_step, sizeof (struct songstep));
+	// set starting position to 0
+	if (reset_position () == false) return false;
 
 	return true;
 }
 
 
+// in case of error, reset the playback so no sound is made
+void error()
+{
+	printf("Error in song data.\n");
+	reset_playback ();
+}
+
+
 
 int main() {
-// MISSING: LOAD FCT
-// SET POSITION TO 0 IN THE SONG
-// test du retour des appels à load song, get_step : si false, ne pas jouer de son...
+// MISSING:
+// -LOAD FCT
+// X-SET POSITION TO 0 IN THE SONG
+// X-RAZ Launchpad
+// X-test du retour des appels à load song, get_step : si false, ne pas jouer de son...
+// -faire une durée sur le sustain?
+// -rajouter une commande à 2 doigts
+// -tester les sons: tous les sons + polyphonie, monophonie
+// -rajout de sons : - 256 positions, plus de positions
+// -rajout de sons: vrai son piano, etc
 // stop previous sound : do we need to do this? need to check:
 // 1- whether playing new sound stops previous sound
 // 2- whether having 0 as sound frequency stops sound in the current channel
+// 
 
 
 	int number_of_songs;
@@ -369,7 +413,7 @@ int main() {
 	stdio_init_all();
 	board_init();
 	printf("Picopadnion\r\n");
-	sleep_ms (3000);	// 3 sec wait to make sure launchpad is awake properly
+	sleep_ms (2000);	// 2 sec wait to make sure launchpad is awake properly
 
 	// configure USB host
 	tusb_init();
@@ -380,11 +424,16 @@ int main() {
 
 	// load song 000 by default, set all the leds, load next step, set next step to #0
 	number_of_songs = song [0];
-	load_song (song_num);
+	if (!load_song (song_num)) error ();
 
 
 	// main loop
 	while (true) {
+
+
+// clear launchpad leds
+reset_launchpad ();
+
 
 		tuh_task();
 		// check connection to USB slave
@@ -482,19 +531,26 @@ void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
 								}
 								// else velocity is 0x7F: pad is pressed on launchpad
 								else {
+									// reset position functionality
+									if (buffer[i+1] == 0x18) {
+										reset_position ();
+										reset_playback ();
+									}
+
 									// determine if the pressed pad is assigned to a step, and which step; we start checking the pads from next_step_number
 									// to make sure we don't miss the next step
-									if (get_step_from_pad_number (song_num, next_step_number, buffer [i+1], &temp_step)) {
+									if (!get_step_from_pad_number (song_num, next_step_number, buffer [i+1], &temp_step)) error ();
+									else {
 										// we have pressed a pad that is assigned to a step
 										if (temp_step.pad_number == next_step.pad_number) {
 											// we have pressed the "next step" pad; for safety, copy "next step" values in "temp" 
 											memcpy (&temp_step, &next_step, sizeof (struct songstep));
 											// color of "next step" pad shall be set back to normal
-											reset_led (&temp_step);
+											set_led (&temp_step);
 											// determine next step in the song
 											if (++next_step_number >= temp_step.number_of_steps) next_step_number = 0;
 											// load new next step structure
-											get_step (song_num, next_step_number, &next_step);
+											if (!get_step (song_num, next_step_number, &next_step)) error ();
 											// set led color of next step in a nice green
 											set_green_led (&next_step);
 										}
