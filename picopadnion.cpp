@@ -49,6 +49,9 @@
 #define MIDI_CONTINUE	0xFB
 #define MIDI_PRG_CHANGE	0xCF	// 0xC0 is program change, 0x0F is midi channel
 
+#define LOAD		0x08
+#define RESET_POS	0x18
+
 #define LED_GPIO	25	// onboard led
 #define LED2_GPIO	255	// 2nd led
 const uint NO_LED_GPIO = 255;
@@ -68,12 +71,14 @@ struct songstep {
 static uint8_t midi_dev_addr = 0;
 static bool connected = false;
 static int song_num = 0;			// by default, song number is 000
+static int number_of_songs;			// number of song in song.h
 static struct songstep cur_step;	// contains data for currently played step of the song
 static struct songstep next_step;	// contains data for next step that should be played in the song
 static int next_step_number;	// number of next step in the song
 
-static bool load = false;			// state functions that are used to determine what to do
-static bool reset_position = false;
+static bool load_pressed = false;			// used for loading functionality
+static bool load_unpressed = false;			// used for loading functionality
+static bool load = false;					// used for loading functionality
 
 
 // midi buffers
@@ -137,6 +142,7 @@ void reset_launchpad ()
 	midi_tx [index_tx++] = 0x00;
 	midi_tx [index_tx++] = 0x00;
 }
+
 
 
 // reset all launchpad leds 
@@ -392,7 +398,7 @@ void error()
 
 int main() {
 // MISSING:
-// -LOAD FCT
+// X-LOAD FCT
 // X-SET POSITION TO 0 IN THE SONG
 // X-RAZ Launchpad
 // X-test du retour des appels à load song, get_step : si false, ne pas jouer de son...
@@ -407,8 +413,8 @@ int main() {
 // 
 
 
-	int number_of_songs;
-	
+	int i, j, k;
+	struct songstep temp_step;
 
 	stdio_init_all();
 	board_init();
@@ -421,6 +427,12 @@ int main() {
 	// configure audio
 	struct audio_buffer_pool *ap = init_audio(synth::sample_rate, PICO_AUDIO_PACK_I2S_DATA, PICO_AUDIO_PACK_I2S_BCLK);
 
+	// set green leds for load button and reset position button
+	temp_step.pad_number = LOAD;		// load button
+	set_green_led (&temp_step);
+	temp_step.pad_number = RESET_POS;	// reset position button
+	set_green_led (&temp_step);
+	
 
 	// load song 000 by default, set all the leds, load next step, set next step to #0
 	number_of_songs = song [0];
@@ -438,6 +450,31 @@ reset_launchpad ();
 		tuh_task();
 		// check connection to USB slave
 		connected = midi_dev_addr != 0 && tuh_midi_configured(midi_dev_addr);
+
+
+		// load functionality
+		if (load_pressed) {			// load pad has just been pressed
+			reset_leds ();			// clear leds
+			// set leds on , according to the number of songs
+			k = 0;
+			while (k < number_of_songs) {		// load mode : set exisiting songs as green buttons (green pads)
+
+				i = k / 8;
+				j = k % 8;
+				temp_step.pad_number = (i * 0x10) + j;		// set song button to green
+				set_green_led (&temp_step);
+				
+				k++;
+			}
+			load_pressed = false;
+			load = true;
+		}
+		if (load_unpressed) {							// load pad has just been unpressed
+			load = false;
+			load_unpressed = false;
+			if (!load_song (song_num)) error ();		// load new song according to song_num
+		}
+
 
 		// in case some MIDI data is to be sent, then send it
 		if (index_tx) {
@@ -496,6 +533,7 @@ void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
 {
 	uint8_t cable_num;
 	uint8_t *buffer;
+	uint8_t j, k, l;
 	uint32_t i;
 	uint32_t bytes_read;
 	struct songstep temp_step;
@@ -515,12 +553,6 @@ void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
 					while (i < bytes_read) {
 						// test values received from midi surface control via MIDI protocol
 						switch (buffer [i] & 0xF0) {	// control only most significant nibble to increment index in buffer; event sorting is approximative, but should be enough
-							case 0x80:	//note off
-								// if pad release is the same number as the last pad that was pressed, then sound off
-								if (buffer [i+1] == cur_step.pad_number) stop_playback ();
-								// else do nothing
-								i+=3;
-								break;
 							case 0x90:	// note on
 								// Would it be useful to put this in the main loop rather than in this callback ?
 
@@ -528,45 +560,70 @@ void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
 								if (buffer[i+2] == 0) {
 									// if pad release is the same number as the last pad that was pressed, then sound off
 									if (buffer [i+1] == cur_step.pad_number) stop_playback ();
+									// if load button is unpressed, then set relevant state
+									if (buffer [i+1] == LOAD) load_unpressed = true;
+
+									i+=3;
+									break;
 								}
+								
 								// else velocity is 0x7F: pad is pressed on launchpad
+								// reset position functionality
+								if (buffer[i+1] == RESET_POS) {
+									reset_position ();
+									reset_playback ();
+									i+=3;
+									break;
+								}
+
+								// load functionality
+								if (buffer[i+1] == LOAD) {
+									load_pressed = true;
+									reset_playback ();
+									i+=3;
+									break;
+								}
+								if (load) {								// we are in load functionality
+									j = buffer [i+1] & 0x0F				// determine which song has been pressed according to pad number
+									k = (buffer [i+1] >> 8) & 0x0F
+									if ((j < 8) && (k < 8)) {			// test boundaries of selected pad, to see if this corresponds to an existing song
+										l = (k * 8) + j;
+										if (l < number_of_songs) song_num = l;	// set song_number with the new value (ie. pad number of pad which has been pressed)
+									}
+									i+=3;
+									break;
+								}
+
+								// determine if the pressed pad is assigned to a step, and which step; we start checking the pads from next_step_number
+								// to make sure we don't miss the next step
+								if (!get_step_from_pad_number (song_num, next_step_number, buffer [i+1], &temp_step)) error ();
 								else {
-									// reset position functionality
-									if (buffer[i+1] == 0x18) {
-										reset_position ();
-										reset_playback ();
+									// we have pressed a pad that is assigned to a step
+									if (temp_step.pad_number == next_step.pad_number) {
+										// we have pressed the "next step" pad; for safety, copy "next step" values in "temp" 
+										memcpy (&temp_step, &next_step, sizeof (struct songstep));
+										// color of "next step" pad shall be set back to normal
+										set_led (&temp_step);
+										// determine next step in the song
+										if (++next_step_number >= temp_step.number_of_steps) next_step_number = 0;
+										// load new next step structure
+										if (!get_step (song_num, next_step_number, &next_step)) error ();
+										// set led color of next step in a nice green
+										set_green_led (&next_step);
 									}
-
-									// determine if the pressed pad is assigned to a step, and which step; we start checking the pads from next_step_number
-									// to make sure we don't miss the next step
-									if (!get_step_from_pad_number (song_num, next_step_number, buffer [i+1], &temp_step)) error ();
-									else {
-										// we have pressed a pad that is assigned to a step
-										if (temp_step.pad_number == next_step.pad_number) {
-											// we have pressed the "next step" pad; for safety, copy "next step" values in "temp" 
-											memcpy (&temp_step, &next_step, sizeof (struct songstep));
-											// color of "next step" pad shall be set back to normal
-											set_led (&temp_step);
-											// determine next step in the song
-											if (++next_step_number >= temp_step.number_of_steps) next_step_number = 0;
-											// load new next step structure
-											if (!get_step (song_num, next_step_number, &next_step)) error ();
-											// set led color of next step in a nice green
-											set_green_led (&next_step);
-										}
 //HERE
-										// stop previous sound : do we need to do this? need to check:
-										// 1- whether playing new sound stops previous sound
-										// 2- whether having 0 as sound frequency stops sound in the current channel
+									// stop previous sound : do we need to do this? need to check:
+									// 1- whether playing new sound stops previous sound
+									// 2- whether having 0 as sound frequency stops sound in the current channel
 
-										// pressed pad is becoming the current pad: fill pad structure
-										memcpy (&cur_step, &temp_step, sizeof (struct songstep));
-										// play new sound
-										update_playback (&cur_step);
-									}
+									// pressed pad is becoming the current pad: fill pad structure
+									memcpy (&cur_step, &temp_step, sizeof (struct songstep));
+									// play new sound
+									update_playback (&cur_step);
 								}
 								i+=3;
 								break;
+							case 0x80:	//note off
 							case 0xA0:
 							case 0xB0:
 							case 0xE0:
