@@ -120,9 +120,16 @@ void poll_usb_rx ()
 
 
 // write lg bytes stored in buffer to midi out
-void send_midi (uint8_t * buffer, uint32_t lg)
+// returns true if data was actually sent, false if not
+bool send_midi (uint8_t * buffer, uint32_t lg)
 {
 	uint32_t nwritten;
+
+if (lg > 9) {
+	lg=9;
+
+}
+printf ("send : %d, index : %d, data : %02X %02X %02X\n", lg, index_tx, buffer[0], buffer[1], buffer[2]);
 
 	if (connected && tuh_midih_get_num_tx_cables(midi_dev_addr) >= 1)
 	{
@@ -130,7 +137,14 @@ void send_midi (uint8_t * buffer, uint32_t lg)
 		if (nwritten != lg) {
 			TU_LOG1("Warning: Dropped %ld byte\r\n", (lg-nwritten));
 		}
+		if (lg == 9) {
+			memmove (midi_tx, midi_tx+9, 450);
+//			for (int i=0; i<450; i++) midi_tx[i] = midi_tx [i+9];
+		}
+		index_tx -=lg;
+		return true;
 	}
+	return false;
 }
 
 
@@ -141,24 +155,6 @@ void reset_launchpad ()
 	midi_tx [index_tx++] = 0xB0;
 	midi_tx [index_tx++] = 0x00;
 	midi_tx [index_tx++] = 0x00;
-}
-
-
-
-// reset all launchpad leds 
-void reset_leds ()
-{
-int i, j;
-
-	for (i = 0; i < 0x80; i+= 0x10) {
-		for (j = 0; j < 0x08 ; j++) {
-			// basically we just add the right midi command to outgoing midi flow
-			// this is NOTE ON (pad number) (pad color)
-			midi_tx [index_tx++] = 0x90;
-			midi_tx [index_tx++] = (i + j);
-			midi_tx [index_tx++] = 0x0C;	// led off
-		}
-	}
 }
 
 
@@ -181,6 +177,40 @@ void set_green_led (struct songstep* step)
 	midi_tx [index_tx++] = 0x90;
 	midi_tx [index_tx++] = step->pad_number;
 	midi_tx [index_tx++] = 0x3C;		// full green
+}
+
+
+// set green leds for load button and reset position button
+void set_function_leds (void)
+{
+struct songstep temp; 					// temporary structure to store step data for the song
+
+	temp.pad_number = LOAD;		// load button
+	set_green_led (&temp);
+	temp.pad_number = RESET_POS;	// reset position button
+	set_green_led (&temp);
+}
+
+
+// reset all launchpad leds 
+void reset_leds ()
+{
+//int i, j;
+
+	// reset launchpad basically resets leds; midi-wise, it is better than switching off each individual led
+	reset_launchpad ();
+	// set function leds in green
+	set_function_leds ();
+
+//	for (i = 0; i < 0x80; i+= 0x10) {
+//		for (j = 0; j < 0x08 ; j++) {
+//			// basically we just add the right midi command to outgoing midi flow
+//			// this is NOTE ON (pad number) (pad color)
+//			midi_tx [index_tx++] = 0x90;
+//			midi_tx [index_tx++] = (i + j);
+//			midi_tx [index_tx++] = 0x0C;	// led off
+//		}
+//	}
 }
 
 
@@ -333,20 +363,25 @@ bool load_instrument(int instr, int chan) {
 
 // reset position in the song to step 0 (start)
 // returns false if an issue has occured
-bool reset_position () {
+bool reset_position (bool is_next_step)
 {
+	// in case "next_step" exists already, color of "next step" pad shall be set back to normal
+	if (is_next_step) set_led (&next_step);
+
 	// initialize next step that should be played in the song to 0
+	// set corresponding led in green
 	// copy also to current step for safety
 	next_step_number = 0;
 	if (get_step (song_num, 0, &next_step) == false) return false;
 	memcpy (&cur_step, &next_step, sizeof (struct songstep));
+	set_green_led (&next_step);		// set next step pad led in green
 	return true;
 }
 
 
 // load song with number NUM
-bool load_song (int num) {
-
+bool load_song (int num)
+{
 int pointer;
 int nb_chan;
 int nb_step;
@@ -358,7 +393,7 @@ struct songstep temp_step;
 
 	// make sure all channels are off
 	reset_playback ();
-	// clear launchpad leds
+	// clear launchpad leds, set function leds on
 	reset_leds ();
 
 	// get pointer to song data
@@ -380,8 +415,8 @@ struct songstep temp_step;
 		set_led (&temp_step);
 	}
 
-	// set starting position to 0
-	if (reset_position () == false) return false;
+	// set starting position to 0, and set next_step accordingly
+	if (reset_position (false) == false) return false;
 
 	return true;
 }
@@ -402,6 +437,7 @@ int main() {
 // X-SET POSITION TO 0 IN THE SONG
 // X-RAZ Launchpad
 // X-test du retour des appels à load song, get_step : si false, ne pas jouer de son...
+// -ring buffer pour envoi des événements MIDI
 // -faire une durée sur le sustain?
 // -rajouter une commande à 2 doigts
 // -tester les sons: tous les sons + polyphonie, monophonie
@@ -416,6 +452,7 @@ int main() {
 	int i, j, k;
 	struct songstep temp_step;
 
+
 	stdio_init_all();
 	board_init();
 	printf("Picopadnion\r\n");
@@ -427,25 +464,15 @@ int main() {
 	// configure audio
 	struct audio_buffer_pool *ap = init_audio(synth::sample_rate, PICO_AUDIO_PACK_I2S_DATA, PICO_AUDIO_PACK_I2S_BCLK);
 
-	// set green leds for load button and reset position button
-	temp_step.pad_number = LOAD;		// load button
-	set_green_led (&temp_step);
-	temp_step.pad_number = RESET_POS;	// reset position button
-	set_green_led (&temp_step);
-	
 
-	// load song 000 by default, set all the leds, load next step, set next step to #0
+	// load song 000 by default, and set green leds for load button and reset position button
+	// set all the leds, load next step, set next step to #0
 	number_of_songs = song [0];
 	if (!load_song (song_num)) error ();
 
 
 	// main loop
 	while (true) {
-
-
-// clear launchpad leds
-reset_launchpad ();
-
 
 		tuh_task();
 		// check connection to USB slave
@@ -454,7 +481,7 @@ reset_launchpad ();
 
 		// load functionality
 		if (load_pressed) {			// load pad has just been pressed
-			reset_leds ();			// clear leds
+			reset_leds ();			// clear leds and light function leds
 			// set leds on , according to the number of songs
 			k = 0;
 			while (k < number_of_songs) {		// load mode : set exisiting songs as green buttons (green pads)
@@ -478,8 +505,8 @@ reset_launchpad ();
 
 		// in case some MIDI data is to be sent, then send it
 		if (index_tx) {
-			send_midi (midi_tx, index_tx);
-			index_tx = 0;
+			if (send_midi (midi_tx, index_tx)) index_tx = index_tx;
+			else printf ("MISSED send, index :%d\n", index_tx);
 		}
 
 		// read MIDI events coming from groovebox and manage accordingly
@@ -570,7 +597,7 @@ void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
 								// else velocity is 0x7F: pad is pressed on launchpad
 								// reset position functionality
 								if (buffer[i+1] == RESET_POS) {
-									reset_position ();
+									reset_position (true);
 									reset_playback ();
 									i+=3;
 									break;
@@ -584,8 +611,8 @@ void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
 									break;
 								}
 								if (load) {								// we are in load functionality
-									j = buffer [i+1] & 0x0F				// determine which song has been pressed according to pad number
-									k = (buffer [i+1] >> 8) & 0x0F
+									j = buffer [i+1] & 0x0F;			// determine which song has been pressed according to pad number
+									k = (buffer [i+1] >> 8) & 0x0F;
 									if ((j < 8) && (k < 8)) {			// test boundaries of selected pad, to see if this corresponds to an existing song
 										l = (k * 8) + j;
 										if (l < number_of_songs) song_num = l;	// set song_number with the new value (ie. pad number of pad which has been pressed)
