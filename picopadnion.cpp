@@ -67,6 +67,11 @@ struct songstep {
 	uint8_t pad_color;					// pad color on the MIDI control surface
 };
 
+struct midisend {						// this struct is used to send midi data
+	uint8_t midilength;					// length of midi data to be sent
+	uint8_t mididata [3];				// midi data; max 3 bytes
+};
+
 // globals
 static uint8_t midi_dev_addr = 0;
 static bool connected = false;
@@ -82,10 +87,12 @@ static bool load = false;					// used for loading functionality
 
 
 // midi buffers
-#define MIDI_BUF_SIZE	500
-static uint8_t midi_rx [MIDI_BUF_SIZE];		// large midi buffer to avoid override when receiving midi
-static uint8_t midi_tx [MIDI_BUF_SIZE];		// large midi buffer to avoid override when receiving midi
-static int index_tx = 0;					// number of bytes to be sent
+#define RX_LG	500						// 500 bytes to receive
+#define TX_LG	200						// 200 midi events to send
+static uint8_t midi_rx [RX_LG];			// large midi buffer to receive data
+static struct midisend midi_tx [TX_LG];	// large midi buffer to send data
+static int index_tx = 0;				// number of events to be sent
+
 
 // channels definition
 using namespace synth;
@@ -119,29 +126,40 @@ void poll_usb_rx ()
 }
 
 
-// write lg bytes stored in buffer to midi out
+// write midi events stored in midi_tx buffer to midi out
 // returns true if data was actually sent, false if not
-bool send_midi (uint8_t * buffer, uint32_t lg)
+bool send_midi (void)
 {
-	uint32_t nwritten;
+	uint32_t nwritten, lg;
+	uint8_t buffer [20];		// small buffer, we should not write more than 3 x 3 = 9 bytes at a time
+	int i, number;
+	int midilimit = 3;
 
-if (lg > 9) {
-	lg=9;
+	// set a limit of sending 3 midi events at a time, to avoid blocking launchpad
+	number = index_tx;
+	if (number > midilimit) number = midilimit;
 
-}
-printf ("send : %d, index : %d, data : %02X %02X %02X\n", lg, index_tx, buffer[0], buffer[1], buffer[2]);
+	// build buffer to be sent, from midi data
+	lg = 0;
+	for (i = 0; i < number; i++) {
+		memcpy (&buffer [lg], midi_tx [i].mididata, midi_tx [i].midilength);
+		lg += midi_tx [i].midilength;
+	}
+
+	// for debug only
+	// printf ("send : %d, num evts : %d, data : %02X %02X %02X\n", lg, index_tx, buffer[0], buffer[1], buffer[2]);
 
 	if (connected && tuh_midih_get_num_tx_cables(midi_dev_addr) >= 1)
 	{
 		nwritten = tuh_midi_stream_write(midi_dev_addr, 0, buffer, lg);
 		if (nwritten != lg) {
-			TU_LOG1("Warning: Dropped %ld byte\r\n", (lg-nwritten));
+			TU_LOG1("Warning: Dropped %ld bytes\r\n", (lg-nwritten));
 		}
-		if (lg == 9) {
-			memmove (midi_tx, midi_tx+9, 450);
-//			for (int i=0; i<450; i++) midi_tx[i] = midi_tx [i+9];
-		}
-		index_tx -=lg;
+
+		// data has been sent somehow: remove midi events that have been sent
+		memmove (midi_tx, &(midi_tx [number]), TX_LG - number);
+		// update number of events still to be sent
+		index_tx -= number;
 		return true;
 	}
 	return false;
@@ -152,9 +170,10 @@ printf ("send : %d, index : %d, data : %02X %02X %02X\n", lg, index_tx, buffer[0
 void reset_launchpad ()
 {
 	// basically we just add the right midi command to outgoing midi flow
-	midi_tx [index_tx++] = 0xB0;
-	midi_tx [index_tx++] = 0x00;
-	midi_tx [index_tx++] = 0x00;
+	midi_tx [index_tx].mididata [0] = 0xB0;
+	midi_tx [index_tx].mididata [1] = 0x00;
+	midi_tx [index_tx].mididata [2] = 0x00;
+	midi_tx [index_tx++].midilength = 3;			// 3 bytes to send
 }
 
 
@@ -163,9 +182,10 @@ void set_led (struct songstep* step)
 {
 	// basically we just add the right midi command to outgoing midi flow
 	// this is NOTE ON (pad number) (pad color)
-	midi_tx [index_tx++] = 0x90;
-	midi_tx [index_tx++] = step->pad_number;
-	midi_tx [index_tx++] = step->pad_color;
+	midi_tx [index_tx].mididata [0] = 0x90;
+	midi_tx [index_tx].mididata [1] = step->pad_number;
+	midi_tx [index_tx].mididata [2] = step->pad_color;
+	midi_tx [index_tx++].midilength = 3;			// 3 bytes to send
 }
 
 
@@ -174,9 +194,10 @@ void set_green_led (struct songstep* step)
 {
 	// basically we just add the right midi command to outgoing midi flow
 	// this is NOTE ON (pad number) (pad color)
-	midi_tx [index_tx++] = 0x90;
-	midi_tx [index_tx++] = step->pad_number;
-	midi_tx [index_tx++] = 0x3C;		// full green
+	midi_tx [index_tx].mididata [0] = 0x90;
+	midi_tx [index_tx].mididata [1] = step->pad_number;
+	midi_tx [index_tx].mididata [2] = 0x3C;
+	midi_tx [index_tx++].midilength = 3;			// 3 bytes to send
 }
 
 
@@ -437,14 +458,14 @@ int main() {
 // X-SET POSITION TO 0 IN THE SONG
 // X-RAZ Launchpad
 // X-test du retour des appels à load song, get_step : si false, ne pas jouer de son...
-// -ring buffer pour envoi des événements MIDI
+// X-ring buffer pour envoi des événements MIDI
 // -faire une durée sur le sustain?
 // -rajouter une commande à 2 doigts
 // -tester les sons: tous les sons + polyphonie, monophonie
 // -rajout de sons : - 256 positions, plus de positions
 // -rajout de sons: vrai son piano, etc
 // stop previous sound : do we need to do this? need to check:
-// 1- whether playing new sound stops previous sound
+// 1- whether playing new sound stops previous sound --> oui si sur le même channel
 // 2- whether having 0 as sound frequency stops sound in the current channel
 // 
 
@@ -505,8 +526,7 @@ int main() {
 
 		// in case some MIDI data is to be sent, then send it
 		if (index_tx) {
-			if (send_midi (midi_tx, index_tx)) index_tx = index_tx;
-			else printf ("MISSED send, index :%d\n", index_tx);
+			if (!send_midi ()) printf ("Could not send midi out, %d midi events in buffer\n", index_tx);
 		}
 
 		// read MIDI events coming from groovebox and manage accordingly
@@ -573,7 +593,7 @@ void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
 		if (num_packets != 0)
 		{
 			while (1) {
-				bytes_read = tuh_midi_stream_read(dev_addr, &cable_num, buffer, MIDI_BUF_SIZE);
+				bytes_read = tuh_midi_stream_read(dev_addr, &cable_num, buffer, RX_LG);
 				if (bytes_read == 0) return;
 				if (cable_num == 0) {
 					i = 0;
