@@ -75,6 +75,7 @@ namespace synth {
     uint16_t  attack_ms     = 2;      // attack period
     uint16_t  decay_ms      = 6;      // decay period
     uint16_t  sustain       = 0xffff; // sustain volume
+    uint16_t  sustain_ms    = 10;     // sustain period
     uint16_t  release_ms    = 1;      // release period
     uint16_t  pulse_width   = 0x7fff; // duty cycle of square wave (default 50%)
     int16_t   noise         = 0;      // current noise value
@@ -112,7 +113,7 @@ namespace synth {
     void trigger_sustain() {
       adsr_frame = 0;
       adsr_phase = ADSRPhase::SUSTAIN;
-      adsr_end_frame = 0;
+      adsr_end_frame = (sustain_ms * sample_rate) / 1000;;
       adsr_step = 0;
     }
     void trigger_release() {

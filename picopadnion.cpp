@@ -108,16 +108,18 @@ synth::AudioChannel synth::channels[CHANNEL_COUNT];
 // 7: pluckedguitar
 // 8: violin
 
-const uint16_t instruments[NB_INSTRUMENTS][6] = {
-	Waveform::TRIANGLE | Waveform::SQUARE, 16, 168, 0xafff, 168, 10000,
-	Waveform::SINE | Waveform::SQUARE, 38, 300, 0, 0, 12000,
-	Waveform::NOISE, 5, 10, 16000, 100, 18000,
-	Waveform::NOISE, 5, 5, 8000, 40, 8000,
-	Waveform::SQUARE, 10, 100, 0, 500, 12000,
-	Waveform::PIANO, 16, 168, 0xafff, 168, 10000,
-	Waveform::REED, 16, 168, 0xafff, 168, 10000,
-	Waveform::PLUCKEDGUITAR, 16, 168, 0xafff, 168, 10000,
-	Waveform::VIOLIN, 16, 168, 0xafff, 168, 10000	
+// waveform, attack in ms, decay in ms, sustain volume, sustain in ms, release in ms, channel volume
+const uint16_t instruments[NB_INSTRUMENTS][7] = {
+	Waveform::TRIANGLE | Waveform::SQUARE, 16, 168, 0xafff, 10000, 168, 10000,
+	Waveform::SINE | Waveform::SQUARE, 38, 300, 0, 0, 0, 12000,
+	Waveform::NOISE, 5, 10, 16000, 10000, 100, 18000,
+	Waveform::NOISE, 5, 5, 8000, 10000, 40, 8000,
+	Waveform::SQUARE, 10, 100, 0, 0, 500, 12000,
+	Waveform::PIANO, 20, 20, 0xafff, 3000, 500, 10000,
+//	Waveform::PIANO, 16, 168, 0xafff, 10000, 168, 10000,
+	Waveform::REED, 16, 168, 0xafff, 100, 3000, 10000,
+	Waveform::PLUCKEDGUITAR, 16, 168, 0xafff, 10000, 168, 10000,
+	Waveform::VIOLIN, 16, 168, 0xafff, 10000, 168, 10000	
 };
 
 
@@ -383,8 +385,9 @@ bool load_instrument(int instr, int chan) {
 	channels[chan].attack_ms   = instruments [instr][1];
 	channels[chan].decay_ms    = instruments [instr][2];
 	channels[chan].sustain     = instruments [instr][3];
-	channels[chan].release_ms  = instruments [instr][4];
-	channels[chan].volume      = instruments [instr][5];
+	channels[chan].sustain_ms  = instruments [instr][4];
+	channels[chan].release_ms  = instruments [instr][5];
+	channels[chan].volume      = instruments [instr][6];
   
 	return true;
 }
@@ -467,14 +470,15 @@ int main() {
 // X-RAZ Launchpad
 // X-test du retour des appels à load song, get_step : si false, ne pas jouer de son...
 // X-ring buffer pour envoi des événements MIDI
-// -faire une durée sur le sustain?
+// X-faire une durée sur le sustain?
 // -rajouter une commande à 2 doigts
-// -tester les sons: tous les sons + polyphonie, monophonie
+// -travail sur les sons : regler l'enveloppe des sons, rajouter des sons
+// X-tester les sons: tous les sons + polyphonie, monophonie
 // X-rajout de sons : - 256 positions, plus de positions
-// -rajout de sons: vrai son piano, etc
-// stop previous sound : do we need to do this? need to check:
-// 1- whether playing new sound stops previous sound --> oui si sur le même channel
-// 2- whether having 0 as sound frequency stops sound in the current channel
+// X-rajout de sons: vrai son piano, etc
+// X stop previous sound : do we need to do this? need to check:
+// X1- whether playing new sound stops previous sound --> oui si sur le même channel
+// X2- whether having 0 as sound frequency stops sound in the current channel
 // 
 
 
@@ -666,10 +670,9 @@ void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
 										// set led color of next step in a nice green
 										set_green_led (&next_step);
 									}
-//HERE
-									// stop previous sound : do we need to do this? need to check:
-									// 1- whether playing new sound stops previous sound
-									// 2- whether having 0 as sound frequency stops sound in the current channel
+									// no need to stop previous sound as:
+									// 1- whenever playing new sound stops previous sound on the same channel
+									// 2- whether having 0 as new sound frequency stops sound in the same channel
 
 									// pressed pad is becoming the current pad: fill pad structure
 									memcpy (&cur_step, &temp_step, sizeof (struct songstep));

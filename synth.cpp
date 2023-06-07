@@ -60,13 +60,17 @@ namespace synth {
         continue;
       }
 
-      if ((channel.adsr_frame >= channel.adsr_end_frame) && (channel.adsr_phase != ADSRPhase::SUSTAIN)) {
+//      if ((channel.adsr_frame >= channel.adsr_end_frame) && (channel.adsr_phase != ADSRPhase::SUSTAIN)) {
+      if (channel.adsr_frame >= channel.adsr_end_frame) {
         switch (channel.adsr_phase) {
           case ADSRPhase::ATTACK:
             channel.trigger_decay();
             break;
           case ADSRPhase::DECAY:
             channel.trigger_sustain();
+            break;
+          case ADSRPhase::SUSTAIN:
+            channel.trigger_release();
             break;
           case ADSRPhase::RELEASE:
             channel.off();
@@ -92,83 +96,88 @@ namespace synth {
         uint8_t waveform_count = 0;
         int32_t channel_sample = 0;
 
-        if(channel.waveforms & Waveform::NOISE) {
-          channel_sample += channel.noise;
-          waveform_count++;
-        }
+        // check if channel frequency is 0; if so, then sample shall be 0
+        if (channel.frequency == 0) channel_sample +=0;
+        // if channel frequency is not 0, then process sample
+        else {
 
-        if(channel.waveforms & Waveform::SAW) {
-          channel_sample += (int32_t)channel.waveform_offset - 0x7fff;
-          waveform_count++;
-        }
-
-        // creates a triangle wave of ^
-        if (channel.waveforms & Waveform::TRIANGLE) {
-          if (channel.waveform_offset < 0x7fff) { // initial quarter up slope
-            channel_sample += int32_t(channel.waveform_offset * 2) - int32_t(0x7fff);
+          if(channel.waveforms & Waveform::NOISE) {
+            channel_sample += channel.noise;
+            waveform_count++;
           }
-          else { // final quarter up slope
-            channel_sample += int32_t(0x7fff) - ((int32_t(channel.waveform_offset) - int32_t(0x7fff)) * 2);
+
+          if(channel.waveforms & Waveform::SAW) {
+            channel_sample += (int32_t)channel.waveform_offset - 0x7fff;
+            waveform_count++;
           }
-          waveform_count++;
-        }
 
-        if (channel.waveforms & Waveform::SQUARE) {
-          channel_sample += (channel.waveform_offset < channel.pulse_width) ? 0x7fff : -0x7fff;
-          waveform_count++;
-        }
-
-        if(channel.waveforms & Waveform::SINE) {
-          // the sine_waveform sample contains 256 samples in
-          // total so we'll just use the most significant bits
-          // of the current waveform position to index into it
-          channel_sample += sine_waveform[channel.waveform_offset >> 8];
-          waveform_count++;
-        }
-
-        if(channel.waveforms & Waveform::PIANO) {
-          // the waveform sample contains 256 samples in
-          // total so we'll just use the most significant bits
-          // of the current waveform position to index into it
-          channel_sample += piano_waveform[channel.waveform_offset >> 8];
-          waveform_count++;
-        }
-
-        if(channel.waveforms & Waveform::REED) {
-          // the waveform sample contains 256 samples in
-          // total so we'll just use the most significant bits
-          // of the current waveform position to index into it
-          channel_sample += reed_waveform[channel.waveform_offset >> 8];
-          waveform_count++;
-        }
-
-        if(channel.waveforms & Waveform::PLUCKEDGUITAR) {
-          // the waveform sample contains 256 samples in
-          // total so we'll just use the most significant bits
-          // of the current waveform position to index into it
-          channel_sample += pluckedguitar_waveform[channel.waveform_offset >> 8];
-          waveform_count++;
-        }
-
-        if(channel.waveforms & Waveform::VIOLIN) {
-          // the waveform sample contains 256 samples in
-          // total so we'll just use the most significant bits
-          // of the current waveform position to index into it
-          channel_sample += violin_waveform[channel.waveform_offset >> 8];
-          waveform_count++;
-        }
-
-        if(channel.waveforms & Waveform::WAVE) {
-
-          // fix to allow buffer loading at the first call
-          if (channel.wave_buf_pos == 0) {
-            if(channel.wave_buffer_callback)
-                channel.wave_buffer_callback(channel);
+          // creates a triangle wave of ^
+          if (channel.waveforms & Waveform::TRIANGLE) {
+            if (channel.waveform_offset < 0x7fff) { // initial quarter up slope
+              channel_sample += int32_t(channel.waveform_offset * 2) - int32_t(0x7fff);
+            }
+            else { // final quarter up slope
+              channel_sample += int32_t(0x7fff) - ((int32_t(channel.waveform_offset) - int32_t(0x7fff)) * 2);
+            }
+            waveform_count++;
           }
-          channel_sample += channel.wave_buffer[channel.wave_buf_pos];
-          if (++channel.wave_buf_pos == 64) {
-            channel.wave_buf_pos = 0;
+
+          if (channel.waveforms & Waveform::SQUARE) {
+            channel_sample += (channel.waveform_offset < channel.pulse_width) ? 0x7fff : -0x7fff;
+            waveform_count++;
           }
+
+          if(channel.waveforms & Waveform::SINE) {
+            // the sine_waveform sample contains 256 samples in
+            // total so we'll just use the most significant bits
+            // of the current waveform position to index into it
+            channel_sample += sine_waveform[channel.waveform_offset >> 8];
+            waveform_count++;
+          }
+
+          if(channel.waveforms & Waveform::PIANO) {
+            // the waveform sample contains 256 samples in
+            // total so we'll just use the most significant bits
+            // of the current waveform position to index into it
+            channel_sample += piano_waveform[channel.waveform_offset >> 8];
+            waveform_count++;
+          }
+
+          if(channel.waveforms & Waveform::REED) {
+            // the waveform sample contains 256 samples in
+            // total so we'll just use the most significant bits
+            // of the current waveform position to index into it
+            channel_sample += reed_waveform[channel.waveform_offset >> 8];
+            waveform_count++;
+          }
+
+          if(channel.waveforms & Waveform::PLUCKEDGUITAR) {
+            // the waveform sample contains 256 samples in
+            // total so we'll just use the most significant bits
+            // of the current waveform position to index into it
+            channel_sample += pluckedguitar_waveform[channel.waveform_offset >> 8];
+            waveform_count++;
+          }
+
+          if(channel.waveforms & Waveform::VIOLIN) {
+            // the waveform sample contains 256 samples in
+            // total so we'll just use the most significant bits
+            // of the current waveform position to index into it
+            channel_sample += violin_waveform[channel.waveform_offset >> 8];
+            waveform_count++;
+          }
+
+          if(channel.waveforms & Waveform::WAVE) {
+
+            // fix to allow buffer loading at the first call
+            if (channel.wave_buf_pos == 0) {
+              if(channel.wave_buffer_callback)
+                  channel.wave_buffer_callback(channel);
+            }
+            channel_sample += channel.wave_buffer[channel.wave_buf_pos];
+            if (++channel.wave_buf_pos == 64) {
+              channel.wave_buf_pos = 0;
+            }
 
 //          channel_sample += channel.wave_buffer[channel.wave_buf_pos];
 //          if (++channel.wave_buf_pos == 64) {
@@ -176,7 +185,8 @@ namespace synth {
 //            if(channel.wave_buffer_callback)
 //                channel.wave_buffer_callback(channel);
 //          }
-          waveform_count++;
+            waveform_count++;
+          }
         }
 
         channel_sample = channel_sample / waveform_count;
