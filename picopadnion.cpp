@@ -41,7 +41,7 @@
 // constants
 #define PICO_AUDIO_PACK_I2S_DATA 9
 #define PICO_AUDIO_PACK_I2S_BCLK 10
-#define NB_INSTRUMENTS 5
+#define NB_INSTRUMENTS 9
 
 #define MIDI_CLOCK		0xF8
 #define MIDI_PLAY		0xFA
@@ -103,13 +103,21 @@ synth::AudioChannel synth::channels[CHANNEL_COUNT];
 // 2: drum
 // 3: hi-hat
 // 4: bass
+// 5: piano
+// 6: reed
+// 7: pluckedguitar
+// 8: violin
 
 const uint16_t instruments[NB_INSTRUMENTS][6] = {
 	Waveform::TRIANGLE | Waveform::SQUARE, 16, 168, 0xafff, 168, 10000,
 	Waveform::SINE | Waveform::SQUARE, 38, 300, 0, 0, 12000,
 	Waveform::NOISE, 5, 10, 16000, 100, 18000,
 	Waveform::NOISE, 5, 5, 8000, 40, 8000,
-	Waveform::SQUARE, 10, 100, 0, 500, 12000
+	Waveform::SQUARE, 10, 100, 0, 500, 12000,
+	Waveform::PIANO, 16, 168, 0xafff, 168, 10000,
+	Waveform::REED, 16, 168, 0xafff, 168, 10000,
+	Waveform::PLUCKEDGUITAR, 16, 168, 0xafff, 168, 10000,
+	Waveform::VIOLIN, 16, 168, 0xafff, 168, 10000	
 };
 
 

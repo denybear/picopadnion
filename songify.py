@@ -79,6 +79,10 @@ def processSong (fileName):
 		song = csv.reader (songFile, delimiter=';', quotechar='\"')
 		# get list of instruments
 		instruments = song.__next__()
+		# remove the last 2 elements from the instrument list (these are pad num and color)
+		del instruments[-1]
+		del instruments[-1]
+
 		# get each step of the song
 		for row in song:
 			steps.append (row)
