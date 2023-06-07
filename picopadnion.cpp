@@ -462,7 +462,7 @@ int main() {
 // -faire une durée sur le sustain?
 // -rajouter une commande à 2 doigts
 // -tester les sons: tous les sons + polyphonie, monophonie
-// -rajout de sons : - 256 positions, plus de positions
+// X-rajout de sons : - 256 positions, plus de positions
 // -rajout de sons: vrai son piano, etc
 // stop previous sound : do we need to do this? need to check:
 // 1- whether playing new sound stops previous sound --> oui si sur le même channel

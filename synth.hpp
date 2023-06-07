@@ -39,7 +39,7 @@ namespace synth {
   // |X   |    |    |    |    |    |    |    |    |    |    |    |    |    |    |    |    |
   // +----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+--->
 
-  #define CHANNEL_COUNT 8
+  #define CHANNEL_COUNT 9
 
   constexpr float pi = 3.14159265358979323846f;
 
@@ -47,6 +47,10 @@ namespace synth {
   extern uint16_t volume;
 
   enum Waveform {
+    VIOLIN    = 2048,
+    PLUCKEDGUITAR = 1024,
+    REED      = 512,
+    PIANO     = 256,
     NOISE     = 128,
     SQUARE    = 64,
     SAW       = 32,
@@ -64,7 +68,7 @@ namespace synth {
   };
 
   struct AudioChannel {
-    uint8_t   waveforms     = 0;      // bitmask for enabled waveforms (see AudioWaveform enum for values)
+    uint16_t  waveforms    = 0;      // bitmask for enabled waveforms (see AudioWaveform enum for values)
     uint16_t  frequency     = 660;    // frequency of the voice (Hz)
     uint16_t  volume        = 0xffff; // channel volume (default 100%)
 
