@@ -4,7 +4,7 @@
  * 
  * MIT License
 
- * Copyright (c) 2022 denybear, rppicomidi
+ * Copyright (c) 2022 denybear, rppicomidi, atoktoto
 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -43,19 +43,32 @@
 #define PICO_AUDIO_PACK_I2S_BCLK 10
 #define NB_INSTRUMENTS 9
 
-#define MIDI_CLOCK		0xF8
-#define MIDI_PLAY		0xFA
-#define MIDI_STOP		0xFC
-#define MIDI_CONTINUE	0xFB
-#define MIDI_PRG_CHANGE	0xCF	// 0xC0 is program change, 0x0F is midi channel
-
 #define LOAD		0x08
 #define RESET_POS	0x18
 
 #define LED_GPIO	25	// onboard led
 #define LED2_GPIO	255	// 2nd led
-const uint NO_LED_GPIO = 255;
+const uint NO_LED_GPIO = 25;
 const uint NO_LED2_GPIO = 255;
+
+// 3 switch pedal; GPIO number 
+#define SWITCH_1	13
+#define SWITCH_2	14
+#define SWITCH_3	15
+#define S1			1
+#define S2			2
+#define RESET		4
+
+#define EXIT_FUNCTION	2000000		// 2000000 usec = 2 sec
+
+// type definition
+struct pedalboard {
+	int value;				// value of pedal variable at the time of calling the function: describes which pedal is pressed
+	bool change_state;		// describes whether pedal state has changed from last call
+	int change_value;		// describes pedal value when state is changed
+	uint64_t change_time;	// describes time elapsed between previous state change and current state change (ie. between previous press and current press); 0 if no state change
+};
+int next_switch;			// value of the switch that should be pressed to do "next" step; 0 if no value assigned yet
 
 // type definition
 struct songstep {
@@ -79,7 +92,7 @@ static int song_num = 0;			// by default, song number is 000
 static int number_of_songs;			// number of song in song.h
 static struct songstep cur_step;	// contains data for currently played step of the song
 static struct songstep next_step;	// contains data for next step that should be played in the song
-static int next_step_number;	// number of next step in the song
+static int next_step_number;		// number of next step in the song
 
 static bool load_pressed = false;			// used for loading functionality
 static bool load_unpressed = false;			// used for loading functionality
@@ -173,6 +186,63 @@ bool send_midi (void)
 		return true;
 	}
 	return false;
+}
+
+
+// test switches and return which switch has been pressed (returns 0 if none)
+int test_switch (int pedal_to_check, struct pedalboard* pedal)
+{
+	int result = 0;
+	static int previous_result = 0;						// previous value for result, required for anti-bounce; this MUST BE static
+	static uint64_t this_press, previous_press = 0;		// time between 2 state changes; this MUST be static
+	int i;
+
+
+	// determine for how long we are in the current state
+	this_press = to_us_since_boot (get_absolute_time());
+	// determine time elapsed between previous state change and current state change (ie. between previous press and current press)
+	pedal->change_time = this_press - previous_press;
+
+	// by default, we assume there is no change in the pedal state (ie. same pedals are pressed / unpressed as for previous function call)
+	pedal->change_state = false;
+
+	// test if switch has been pressed
+	// in this case, line is down (level 0)
+	if ((pedal_to_check & S1) && gpio_get (SWITCH_1)==0) {
+		result |= S1;
+	}
+
+	if ((pedal_to_check & S2) && gpio_get (SWITCH_2)==0) {
+		result |= S2;
+	}
+
+	if ((pedal_to_check & RESET) && gpio_get (SWITCH_3)==0) {
+		result |= RESET;
+	}
+
+	// check whether there has been a change of state in the pedal (pedal pressed or unpressed...)
+	// this allows to have anti-bouncing when pedal goes from unpressed to pressed, or from pressed to unpressed
+	if (result != previous_result) {
+		// anti-bouncing functionality
+		if (pedal->change_time < 30000) {		// change of state within less than 30ms: we assume this is a bounce; we keep previous values
+			pedal->value = previous_result;
+			return previous_result;				// if previous call was done less than 30ms, then leave
+		}
+
+		// pedal state has changed; set variables accordingly
+		pedal->change_state = true;
+		pedal->change_value = previous_result;
+		previous_press = this_press;
+	}
+
+	// LED ON or LED OFF depending if a switch has been pressed
+	if (NO_LED_GPIO != LED_GPIO) gpio_put(LED_GPIO, (result ? true : false));		// if onboard led and if we are within time window, lite LED on/off
+	if (NO_LED2_GPIO != LED2_GPIO) gpio_put(LED2_GPIO, (result ? true : false));	// if another led and if we are within time window, lite LED on/off
+
+	// copy pedal values and return
+	previous_result = result;
+	pedal->value = result;
+	return result;
 }
 
 
@@ -407,6 +477,10 @@ bool reset_position (bool is_next_step)
 	if (get_step (song_num, 0, &next_step) == false) return false;
 	memcpy (&cur_step, &next_step, sizeof (struct songstep));
 	set_green_led (&next_step);		// set next step pad led in green
+
+	// for use with pedal switch only
+	next_switch = 0;			// value of the switch that should be pressed to do "next" step; 0 if no value assigned yet
+
 	return true;
 }
 
@@ -471,7 +545,7 @@ int main() {
 // X-test du retour des appels à load song, get_step : si false, ne pas jouer de son...
 // X-ring buffer pour envoi des événements MIDI
 // X-faire une durée sur le sustain?
-// -rajouter une commande à 2 doigts
+// X-rajouter une commande à 2 doigts
 // -travail sur les sons : regler l'enveloppe des sons, rajouter des sons
 // X-tester les sons: tous les sons + polyphonie, monophonie
 // X-rajout de sons : - 256 positions, plus de positions
@@ -484,6 +558,7 @@ int main() {
 
 	int i, j, k;
 	struct songstep temp_step;
+	struct pedalboard pedal;
 
 
 	stdio_init_all();
@@ -496,6 +571,31 @@ int main() {
 
 	// configure audio
 	struct audio_buffer_pool *ap = init_audio(synth::sample_rate, PICO_AUDIO_PACK_I2S_DATA, PICO_AUDIO_PACK_I2S_BCLK);
+
+	// Map the pins to functions
+	gpio_init(LED_GPIO);
+	gpio_set_dir(LED_GPIO, GPIO_OUT);
+
+	gpio_init(LED2_GPIO);
+	gpio_set_dir(LED2_GPIO, GPIO_OUT);
+
+	gpio_init(SWITCH_1);
+	gpio_set_dir(SWITCH_1, GPIO_IN);
+	gpio_pull_up (SWITCH_1);		 // switch pull-up
+
+	gpio_init(SWITCH_2);
+	gpio_set_dir(SWITCH_2, GPIO_IN);
+	gpio_pull_up (SWITCH_2);		 // switch pull-up
+
+	gpio_init(SWITCH_3);
+	gpio_set_dir(SWITCH_3, GPIO_IN);
+	gpio_pull_up (SWITCH_3);		 // switch pull-up
+
+	// init pedal structure to all 0
+	pedal.value = 0;
+	pedal.change_state = false;
+	pedal.change_value = 0;
+	pedal.change_time = 0;
 
 
 	// load song 000 by default, and set green leds for load button and reset position button
@@ -510,6 +610,65 @@ int main() {
 		tuh_task();
 		// check connection to USB slave
 		connected = midi_dev_addr != 0 && tuh_midi_configured(midi_dev_addr);
+
+		// test pedal and check if one of them is pressed
+		test_switch (S1 | S2 | RESET, &pedal);
+
+		// check if state has changed, ie. pedal has just been pressed or unpressed
+		if (pedal.change_state) {
+
+			// play a sound
+			if ((pedal.value == S1) || (pedal.value == S2)) {
+
+				// in case next_switch value is undetermined, force this press as being "next"
+				if (next_switch == 0) next_switch = pedal.value;
+
+				// assign current step to temp variable : this is the pad we are going to "play" if next switch has not been pressed
+				memcpy (&temp_step, &cur_step, sizeof (struct songstep));
+				
+				// test if we pressed "next" switch, ie. the switch that makes us move to next step in the song
+				if (pedal.value == next_switch) {
+					// we have pressed "next step"
+					// for safety, copy "next step" values in "temp" 
+					memcpy (&temp_step, &next_step, sizeof (struct songstep));
+					// color of "next step" pad shall be set back to normal
+					set_led (&temp_step);
+					// determine next step in the song
+					if (++next_step_number >= temp_step.number_of_steps) next_step_number = 0;
+					// load new next step structure
+					if (!get_step (song_num, next_step_number, &next_step)) error ();
+					// set led color of next step in a nice green
+					set_green_led (&next_step);
+					// assign next pedal/switch that should be pressed to have "next" step the next time
+					next_switch = ((pedal.value == S1) ? S2 : S1);
+				}
+				
+				// no need to stop previous sound as:
+				// 1- whenever playing new sound stops previous sound on the same channel
+				// 2- whether having 0 as new sound frequency stops sound in the same channel
+
+				// temp step is becoming the current step: fill pad structure
+				// the trick here is that temp is either set as current step (in case no next switch has been pressed), or at next step (if next step switch has been pressed)
+				memcpy (&cur_step, &temp_step, sizeof (struct songstep));
+				// play new sound
+				update_playback (&cur_step);
+			}
+
+			// if pedal has been released, then stop playback
+			if (pedal.value == 0) {
+				stop_playback ();
+			}
+
+			// check if RESET_POS pedal switch has been pressed for more than 2 sec
+			if ((pedal.value == 0) && (pedal.change_value & RESET)) {
+				// no pedal pressed anymore and pedal previously pressed was RESET
+				// check how much time the previous pedal was pressed; if more than 2 sec, then reset position to 0 in the song
+				if (pedal.change_time >= EXIT_FUNCTION) {
+					reset_position (true);			// reset position in the song to 0
+					reset_playback ();
+				}
+			}
+		}
 
 
 		// load functionality
