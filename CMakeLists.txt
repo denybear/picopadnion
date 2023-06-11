@@ -4,7 +4,7 @@ set(BOARD pico_sdk)
 include(pico_sdk_import.cmake)
 include(pico_extras_import.cmake)
 
-set(target_proj picopadnion)
+set(target_proj picopanion)
 project(${target_proj} C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -13,7 +13,7 @@ pico_sdk_init()
 #add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/midi_uart_lib)
 
 add_executable(${target_proj}
-    picopadnion.cpp
+    picopanion.cpp
     audio.hpp
     synth.cpp
     song.h

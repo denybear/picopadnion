@@ -1,6 +1,6 @@
 /**
- * @file picovation.c
- * @brief A pico board acting as USB Host and sending session signals to external groovebox (Novation Circuit) at press of a button
+ * @file picopanion.c
+ * @brief A instrument based on raspberry pico, pimoroni's pico-sound module and novation launchpad, used to accompany a live band.
  * 
  * MIT License
 
@@ -562,8 +562,8 @@ int main() {
 
 	stdio_init_all();
 	board_init();
-	printf("Picopadnion\r\n");
-	sleep_ms (2000);	// 2 sec wait to make sure launchpad is awake properly
+	printf("Picopanion\r\n");
+//	sleep_ms (2000);	// 2 sec wait to make sure launchpad is awake properly
 
 	// configure USB host
 	tusb_init();
