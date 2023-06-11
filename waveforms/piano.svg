@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="256mm"
+   height="256mm"
+   viewBox="0 0 255.99999 256"
+   version="1.1"
+   id="svg5"
+   inkscape:version="1.2.2 (732a01da63, 2022-12-09)"
+   sodipodi:docname="piano.svg"
+   xml:space="preserve"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="false"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showgrid="true"
+     inkscape:zoom="0.59094932"
+     inkscape:cx="160.75829"
+     inkscape:cy="450.9693"
+     inkscape:window-width="1920"
+     inkscape:window-height="1121"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1"><inkscape:grid
+       type="xygrid"
+       id="grid3331"
+       spacingx="15.999999"
+       spacingy="15.999999"
+       empspacing="32"
+       originx="0"
+       originy="0"
+       units="mm" /></sodipodi:namedview><defs
+     id="defs2" /><g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"><path
+       style="opacity:0.4;fill:none;stroke:#0000ff;stroke-width:0.416232;paint-order:fill markers stroke"
+       d="M 0,128 C 0,128 20.350043,13.805648 33.878416,3.5371089 c 7.03889,-5.3427808 3.75788,17.9699461 18.789402,17.9699461 15.031525,0 61.015722,-4.107418 75.295662,6.674553 14.27995,10.781971 3.00616,174.789722 44.82181,176.105432 14.47997,0.45561 25.83363,-12.43512 39.08197,-17.24723 9.38477,-3.4088 10.53721,36.18854 23.29886,35.21718 C 242.25436,221.71746 256,128 256,128"
+       id="path685"
+       sodipodi:nodetypes="cssssssc" /></g></svg>
