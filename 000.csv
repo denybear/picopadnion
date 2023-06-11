@@ -1,4 +1,4 @@
-﻿melody;melody;melody;rhythm;rhythm;rhythm;drum;drum;hi-hat;;
+﻿piano;piano;piano;piano2;piano2;piano2;reed;reed;reed;;
 C2;;;;;;;;;0x00;amber
 C3;;;;;;;;;0x01;amber
 C4;;;;;;;;;0x02;amber
@@ -15,6 +15,11 @@ C5;E5;G5;;;;;;;0x07;yellow
 ;;;C3;E3;G3;;;;0x15;red
 ;;;C4;E4;G4;;;;0x16;red
 ;;;C5;E5;G5;;;;0x17;red
-;;;;;;bass;;;0x75;red
-;;;;;;;snare;;0x76;red
-;;;;;;;;hat;0x77;red
+;;;;;;C2;;;0x20;orange
+;;;;;;C3;;;0x21;orange
+;;;;;;C4;;;0x22;orange
+;;;;;;C5;;;0x23;orange
+;;;;;;C2;E2;G2;0x24;red
+;;;;;;C3;E3;G3;0x25;red
+;;;;;;C4;E4;G4;0x26;red
+;;;;;;C5;E5;G5;0x27;red
