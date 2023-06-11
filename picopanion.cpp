@@ -111,28 +111,37 @@ static int index_tx = 0;				// number of events to be sent
 using namespace synth;
 synth::AudioChannel synth::channels[CHANNEL_COUNT];
 
-// 0: melody
-// 1: rhythm
-// 2: drum
-// 3: hi-hat
-// 4: bass
-// 5: piano
-// 6: reed
-// 7: pluckedguitar
-// 8: violin
+// 0: piano
+// 1: piano2
+// 2: reed
+// 3: guitar
+// 4: pluckedguitar
+// 5: bass
+// 6: violin
+// 7: horn
+// 8: oboe
+// 9: clarinette
+// 10: flute
 
 // waveform, attack in ms, decay in ms, sustain volume, sustain in ms, release in ms, channel volume
-const uint16_t instruments[NB_INSTRUMENTS][7] = {
-	Waveform::TRIANGLE | Waveform::SQUARE, 16, 168, 0xafff, 10000, 168, 10000,
-	Waveform::SINE | Waveform::SQUARE, 38, 300, 0, 0, 0, 12000,
-	Waveform::NOISE, 5, 10, 16000, 10000, 100, 18000,
-	Waveform::NOISE, 5, 5, 8000, 10000, 40, 8000,
-	Waveform::SQUARE, 10, 100, 0, 0, 500, 12000,
+const uint16_t instruments[NB_INSTRUMENTS][11] = {
 	Waveform::PIANO, 20, 20, 0xafff, 3000, 500, 10000,
-//	Waveform::PIANO, 16, 168, 0xafff, 10000, 168, 10000,
+	Waveform::PIANO2, 20, 20, 0xafff, 3000, 500, 10000,
 	Waveform::REED, 16, 168, 0xafff, 100, 3000, 10000,
+	Waveform::GUITAR, 16, 168, 0xafff, 10000, 168, 10000,
 	Waveform::PLUCKEDGUITAR, 16, 168, 0xafff, 10000, 168, 10000,
+	Waveform::SQUARE, 10, 100, 0, 0, 500, 12000,
 	Waveform::VIOLIN, 16, 168, 0xafff, 10000, 168, 10000	
+	Waveform::HORN, 16, 168, 0xafff, 10000, 168, 10000	
+	Waveform::OBOE, 16, 168, 0xafff, 10000, 168, 10000	
+	Waveform::CLARINETTE, 16, 168, 0xafff, 10000, 168, 10000	
+	Waveform::FLUTE, 16, 168, 0xafff, 10000, 168, 10000	
+
+//	Waveform::TRIANGLE | Waveform::SQUARE, 16, 168, 0xafff, 10000, 168, 10000,		//melody
+//	Waveform::SINE | Waveform::SQUARE, 38, 300, 0, 0, 0, 12000,						//rhythm
+//	Waveform::NOISE, 5, 10, 16000, 10000, 100, 18000,								//drum
+//	Waveform::NOISE, 5, 5, 8000, 10000, 40, 8000,									//hihat
+//	Waveform::SQUARE, 10, 100, 0, 0, 500, 12000,									//bass
 };
 
 
