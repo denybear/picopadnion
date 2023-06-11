@@ -195,7 +195,6 @@ int test_switch (int pedal_to_check, struct pedalboard* pedal)
 	int result = 0;
 	static int previous_result = 0;						// previous value for result, required for anti-bounce; this MUST BE static
 	static uint64_t this_press, previous_press = 0;		// time between 2 state changes; this MUST be static
-	int i;
 
 
 	// determine for how long we are in the current state
