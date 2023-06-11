@@ -1,4 +1,4 @@
-﻿piano;piano2;reed;guitar;pluckedguitar;bass;;;;;
+﻿violin;horn;oboe;clarinette;flute;;;;;;
 C3;;;;;;;;;0x00;amber
 D3;;;;;;;;;0x01;amber
 E3;;;;;;;;;0x02;amber
@@ -39,11 +39,3 @@ C4;;;;;;;;;0x07;amber
 ;;;;A3;;;;;0x45;amber
 ;;;;B3;;;;;0x46;amber
 ;;;;C4;;;;;0x47;amber
-;;;;;C3;;;;0x50;orange
-;;;;;D3;;;;0x51;orange
-;;;;;E3;;;;0x52;orange
-;;;;;F3;;;;0x53;orange
-;;;;;G3;;;;0x54;orange
-;;;;;A3;;;;0x55;orange
-;;;;;B3;;;;0x56;orange
-;;;;;C4;;;;0x57;orange
