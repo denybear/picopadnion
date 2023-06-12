@@ -41,7 +41,7 @@
 // constants
 #define PICO_AUDIO_PACK_I2S_DATA 9
 #define PICO_AUDIO_PACK_I2S_BCLK 10
-#define NB_INSTRUMENTS 9
+#define NB_INSTRUMENTS 11
 
 #define LOAD		0x08
 #define RESET_POS	0x18
@@ -124,7 +124,7 @@ synth::AudioChannel synth::channels[CHANNEL_COUNT];
 // 10: flute
 
 // waveform, attack in ms, decay in ms, sustain volume, sustain in ms, release in ms, channel volume
-const uint32_t instruments[NB_INSTRUMENTS][11] = {
+const uint32_t instruments[NB_INSTRUMENTS][7] = {
 	Waveform::PIANO, 20, 20, 0xafff, 3000, 500, 10000,
 	Waveform::PIANO2, 20, 20, 0xafff, 3000, 500, 10000,
 	Waveform::REED, 16, 168, 0xafff, 100, 3000, 10000,
