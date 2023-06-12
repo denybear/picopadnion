@@ -124,17 +124,17 @@ synth::AudioChannel synth::channels[CHANNEL_COUNT];
 // 10: flute
 
 // waveform, attack in ms, decay in ms, sustain volume, sustain in ms, release in ms, channel volume
-const uint16_t instruments[NB_INSTRUMENTS][11] = {
+const uint32_t instruments[NB_INSTRUMENTS][11] = {
 	Waveform::PIANO, 20, 20, 0xafff, 3000, 500, 10000,
 	Waveform::PIANO2, 20, 20, 0xafff, 3000, 500, 10000,
 	Waveform::REED, 16, 168, 0xafff, 100, 3000, 10000,
 	Waveform::GUITAR, 16, 168, 0xafff, 10000, 168, 10000,
 	Waveform::PLUCKEDGUITAR, 16, 168, 0xafff, 10000, 168, 10000,
 	Waveform::SQUARE, 10, 100, 0, 0, 500, 12000,
-	Waveform::VIOLIN, 16, 168, 0xafff, 10000, 168, 10000	
-	Waveform::HORN, 16, 168, 0xafff, 10000, 168, 10000	
-	Waveform::OBOE, 16, 168, 0xafff, 10000, 168, 10000	
-	Waveform::CLARINETTE, 16, 168, 0xafff, 10000, 168, 10000	
+	Waveform::VIOLIN, 16, 168, 0xafff, 10000, 168, 10000,
+	Waveform::HORN, 16, 168, 0xafff, 10000, 168, 10000,
+	Waveform::OBOE, 16, 168, 0xafff, 10000, 168, 10000,
+	Waveform::CLARINETTE, 16, 168, 0xafff, 10000, 168, 10000,
 	Waveform::FLUTE, 16, 168, 0xafff, 10000, 168, 10000	
 
 //	Waveform::TRIANGLE | Waveform::SQUARE, 16, 168, 0xafff, 10000, 168, 10000,		//melody

@@ -10,7 +10,7 @@ namespace synth {
   //
   // - Attack:  number of milliseconds it takes for a note to hit full volume
   // - Decay:   number of milliseconds it takes for a note to settle to sustain volume
-  // - Sustain: percentage of full volume that the note sustains at (duration implied by other factors)
+  // - Sustain: percentage of full volume that the note sustains at, and duration in ms
   // - Release: number of milliseconds it takes for a note to reduce to zero volume after it has ended
   //
   // Attack (750ms) - Decay (500ms) -------- Sustain ----- Release (250ms)

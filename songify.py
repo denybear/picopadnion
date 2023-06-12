@@ -75,6 +75,7 @@ def processSong (fileName):
 	steps = []
 	result = []
 
+	print ('analyzing song ' + fileName + '\n')
 	with open(fileName+'.csv', newline='', encoding='utf-8-sig') as songFile:
 		song = csv.reader (songFile, delimiter=';', quotechar='\"')
 		# get list of instruments
@@ -82,9 +83,6 @@ def processSong (fileName):
 		# remove the last 2 elements from the instrument list (these are pad num and color)
 		del instruments[-1]
 		del instruments[-1]
-		# check if instrument is not empty
-		while instruments[-1] == '':
-			del instruments[-1]
 
 		# get each step of the song
 		for row in song:
@@ -94,8 +92,12 @@ def processSong (fileName):
 
 	# put number of instruments and number of steps in the result
 	result.append (len (instruments))
+	print ('number of instruments: %d', len (instruments))
+	print (instruments)
+
 	result.append (len (steps))
-	
+	print ('number of steps: %d', len (steps))
+
 	# change instrument name with instrument number and add to the result
 	for i in instruments:
 		result.append (instr[i])

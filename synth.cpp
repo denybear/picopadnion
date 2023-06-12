@@ -210,7 +210,7 @@ namespace synth {
             // the waveform sample contains 256 samples in
             // total so we'll just use the most significant bits
             // of the current waveform position to index into it
-            channel_sample += CLARINETTE_waveform[channel.waveform_offset >> 8];
+            channel_sample += clarinette_waveform[channel.waveform_offset >> 8];
             waveform_count++;
           }
 
