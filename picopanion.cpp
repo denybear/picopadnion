@@ -52,9 +52,9 @@ const uint NO_LED_GPIO = 25;
 const uint NO_LED2_GPIO = 255;
 
 // 3 switch pedal; GPIO number 
-#define SWITCH_1	13
-#define SWITCH_2	14
-#define SWITCH_3	15
+#define SWITCH_1	14
+#define SWITCH_2	15
+#define SWITCH_3	13
 #define S1			1
 #define S2			2
 #define RESET		4
@@ -123,19 +123,20 @@ synth::AudioChannel synth::channels[CHANNEL_COUNT];
 // 9: clarinette
 // 10: flute
 
-// waveform, attack in ms, decay in ms, sustain volume, sustain in ms, release in ms, channel volume
+// waveform, attack in ms, decay in ms, sustain volume (0xafff = 70% of max volume), sustain in ms,
+// release in ms, channel volume (set at 10000 to avoid saturation; it can be up to 0xffff)
 const uint32_t instruments[NB_INSTRUMENTS][7] = {
-	Waveform::PIANO, 20, 20, 0xafff, 3000, 500, 10000,
-	Waveform::PIANO2, 20, 20, 0xafff, 3000, 500, 10000,
-	Waveform::REED, 16, 168, 0xafff, 100, 3000, 10000,
-	Waveform::GUITAR, 16, 168, 0xafff, 10000, 168, 10000,
-	Waveform::PLUCKEDGUITAR, 16, 168, 0xafff, 10000, 168, 10000,
-	Waveform::SQUARE, 10, 100, 0, 0, 500, 12000,
-	Waveform::VIOLIN, 16, 168, 0xafff, 10000, 168, 10000,
-	Waveform::HORN, 16, 168, 0xafff, 10000, 168, 10000,
-	Waveform::OBOE, 16, 168, 0xafff, 10000, 168, 10000,
-	Waveform::CLARINETTE, 16, 168, 0xafff, 10000, 168, 10000,
-	Waveform::FLUTE, 16, 168, 0xafff, 10000, 168, 10000	
+	Waveform::PIANO, 30, 20, 0xafff, 2000, 1000, 10000,
+	Waveform::PIANO2, 30, 20, 0xafff, 2000, 1000, 10000,
+	Waveform::REED, 30, 20, 0xafff, 2000, 1000, 10000,
+	Waveform::GUITAR, 10, 10, 0xafff, 1000, 500, 10000,
+	Waveform::PLUCKEDGUITAR, 10, 10, 0xafff, 1000, 500, 10000,
+	Waveform::SQUARE, 10, 10, 0xafff, 1000, 500, 5000,
+	Waveform::VIOLIN, 50, 200, 0xafff, 500, 5000, 10000,
+	Waveform::HORN, 120, 50, 0xafff, 2000, 100, 10000,
+	Waveform::OBOE, 120, 50, 0xafff, 2000, 100, 10000,
+	Waveform::CLARINETTE, 120, 50, 0xafff, 2000, 100, 10000,
+	Waveform::FLUTE, 120, 50, 0xafff, 2000, 100, 10000	
 
 //	Waveform::TRIANGLE | Waveform::SQUARE, 16, 168, 0xafff, 10000, 168, 10000,		//melody
 //	Waveform::SINE | Waveform::SQUARE, 38, 300, 0, 0, 0, 12000,						//rhythm
@@ -546,23 +547,6 @@ void error()
 
 
 int main() {
-// MISSING:
-// X-LOAD FCT
-// X-SET POSITION TO 0 IN THE SONG
-// X-RAZ Launchpad
-// X-test du retour des appels à load song, get_step : si false, ne pas jouer de son...
-// X-ring buffer pour envoi des événements MIDI
-// X-faire une durée sur le sustain?
-// X-rajouter une commande à 2 doigts
-// -travail sur les sons : regler l'enveloppe des sons, rajouter des sons
-// X-tester les sons: tous les sons + polyphonie, monophonie
-// X-rajout de sons : - 256 positions, plus de positions
-// X-rajout de sons: vrai son piano, etc
-// X stop previous sound : do we need to do this? need to check:
-// X1- whether playing new sound stops previous sound --> oui si sur le même channel
-// X2- whether having 0 as sound frequency stops sound in the current channel
-// 
-
 
 	int i, j, k;
 	struct songstep temp_step;
