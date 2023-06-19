@@ -54,7 +54,8 @@ const uint NO_LED2_GPIO = 255;
 // 3 switch pedal; GPIO number 
 #define SWITCH_1	14
 #define SWITCH_2	15
-#define SWITCH_3	13
+#define SWITCH_3	16		// dummy value in case no 3rd switch
+//#define SWITCH_3	13
 #define S1			1
 #define S2			2
 #define RESET		4
@@ -101,7 +102,7 @@ static bool load = false;					// used for loading functionality
 
 // midi buffers
 #define RX_LG	500						// 500 bytes to receive
-#define TX_LG	200						// 200 midi events to send
+#define TX_LG	1000					// 1000 midi events to send
 static uint8_t midi_rx [RX_LG];			// large midi buffer to receive data
 static struct midisend midi_tx [TX_LG];	// large midi buffer to send data
 static int index_tx = 0;				// number of events to be sent
@@ -259,9 +260,14 @@ int test_switch (int pedal_to_check, struct pedalboard* pedal)
 void reset_launchpad ()
 {
 	// basically we just add the right midi command to outgoing midi flow
-	midi_tx [index_tx].mididata [0] = 0xB0;
+	midi_tx [index_tx].mididata [0] = 0xB0;			// reset launchpad
 	midi_tx [index_tx].mididata [1] = 0x00;
 	midi_tx [index_tx].mididata [2] = 0x00;
+	midi_tx [index_tx++].midilength = 3;			// 3 bytes to send
+	// basically we just add the right midi command to outgoing midi flow
+	midi_tx [index_tx].mididata [0] = 0xB0;			// grid type XY
+	midi_tx [index_tx].mididata [1] = 0x00;
+	midi_tx [index_tx].mididata [2] = 0x01;
 	midi_tx [index_tx++].midilength = 3;			// 3 bytes to send
 }
 
@@ -556,7 +562,6 @@ int main() {
 	stdio_init_all();
 	board_init();
 	printf("Picopanion\r\n");
-//	sleep_ms (2000);	// 2 sec wait to make sure launchpad is awake properly
 
 	// configure USB host
 	tusb_init();
@@ -588,7 +593,6 @@ int main() {
 	pedal.change_state = false;
 	pedal.change_value = 0;
 	pedal.change_time = 0;
-
 
 	// load song 000 by default, and set green leds for load button and reset position button
 	// set all the leds, load next step, set next step to #0
