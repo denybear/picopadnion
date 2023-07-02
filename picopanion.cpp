@@ -52,10 +52,9 @@ const uint NO_LED_GPIO = 25;
 const uint NO_LED2_GPIO = 255;
 
 // 3 switch pedal; GPIO number 
-#define SWITCH_1	14
-#define SWITCH_2	15
-#define SWITCH_3	16		// dummy value in case no 3rd switch
-//#define SWITCH_3	13
+#define SWITCH_1	15
+#define SWITCH_2	14
+#define SWITCH_3	13
 #define S1			1
 #define S2			2
 #define RESET		4
@@ -605,7 +604,7 @@ int main() {
 
 		tuh_task();
 		// check connection to USB slave
-		connected = midi_dev_addr != 0 && tuh_midi_configured(midi_dev_addr);
+		connected = ((midi_dev_addr != 0) && tuh_midi_configured(midi_dev_addr));
 
 		// test pedal and check if one of them is pressed
 		test_switch (S1 | S2 | RESET, &pedal);
@@ -693,7 +692,8 @@ int main() {
 
 		// in case some MIDI data is to be sent, then send it
 		if (index_tx) {
-			if (!send_midi ()) printf ("Could not send midi out, %d midi events in buffer\n", index_tx);
+//			if (!send_midi ()) printf ("Could not send midi out, %d midi events in buffer\n", index_tx);
+			send_midi ();
 		}
 
 		// read MIDI events coming from groovebox and manage accordingly
