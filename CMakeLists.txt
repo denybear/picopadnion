@@ -32,7 +32,7 @@ target_compile_definitions(${target_proj} PRIVATE
 target_include_directories(${target_proj} PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 
 target_link_options(${target_proj} PRIVATE -Xlinker --print-memory-usage)
-target_compile_options(${target_proj} PRIVATE -Wall -Wextra -DCFG_TUSB_DEBUG=3)
+target_compile_options(${target_proj} PRIVATE -Wall -Wextra -DCFG_TUSB_DEBUG=1)
 target_link_libraries(${target_proj} tinyusb_host tinyusb_board pico_audio_i2s pico_stdlib)
 
 pico_add_extra_outputs(${target_proj})
