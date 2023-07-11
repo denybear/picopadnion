@@ -671,7 +671,7 @@ int main() {
 			reset_leds ();			// clear leds and light function leds
 			// set leds on , according to the number of songs
 			k = 0;
-			while (k < number_of_songs) {		// load mode : set exisiting songs as green buttons (green pads)
+			while (k < number_of_songs) {		// load mode : set existing songs as green buttons (green pads)
 
 				i = k / 8;
 				j = k % 8;
@@ -798,8 +798,8 @@ void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
 									break;
 								}
 								if (load) {								// we are in load functionality
-									j = buffer [i+1] & 0x0F;			// determine which song has been pressed according to pad number
-									k = (buffer [i+1] >> 8) & 0x0F;
+									j = buffer [i+1] & 0x0F;			// determine which song has been pressed according to pad number: low nibble
+									k = (buffer [i+1] >> 4) & 0x0F;		// high nibble
 									if ((j < 8) && (k < 8)) {			// test boundaries of selected pad, to see if this corresponds to an existing song
 										l = (k * 8) + j;
 										if (l < number_of_songs) song_num = l;	// set song_number with the new value (ie. pad number of pad which has been pressed)
