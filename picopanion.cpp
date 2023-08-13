@@ -43,15 +43,16 @@
 #define PICO_AUDIO_PACK_I2S_BCLK 10
 #define NB_INSTRUMENTS 11
 
-#define LOAD		0x08
-#define RESET_POS	0x18
+#define LOAD				0x08
+#define CHANGE_INSTRUMENT	0x18
+#define RESET_POS			0x28
 
 #define LED_GPIO	25	// onboard led
 #define LED2_GPIO	255	// 2nd led
 const uint NO_LED_GPIO = 25;
 const uint NO_LED2_GPIO = 255;
 
-// 3 switch pedal; GPIO number 
+// 3 switch pedal; GPIO number
 #define SWITCH_1	15
 #define SWITCH_2	14
 #define SWITCH_3	13
@@ -90,6 +91,7 @@ static uint8_t midi_dev_addr = 0;
 static bool connected = false;
 static int song_num = 0;			// by default, song number is 000
 static int number_of_songs;			// number of song in song.h
+static int instr_offset = 0;		// instrument offset: used to change instrument of the song
 static struct songstep cur_step;	// contains data for currently played step of the song
 static struct songstep next_step;	// contains data for next step that should be played in the song
 static int next_step_number;		// number of next step in the song
@@ -97,6 +99,7 @@ static int next_step_number;		// number of next step in the song
 static bool load_pressed = false;			// used for loading functionality
 static bool load_unpressed = false;			// used for loading functionality
 static bool load = false;					// used for loading functionality
+static bool instr_pressed = false;			// used for change instrument functionality
 
 
 // midi buffers
@@ -300,9 +303,11 @@ void set_function_leds (void)
 {
 struct songstep temp; 					// temporary structure to store step data for the song
 
-	temp.pad_number = LOAD;		// load button
+	temp.pad_number = LOAD;					// load button
 	set_green_led (&temp);
-	temp.pad_number = RESET_POS;	// reset position button
+	temp.pad_number = CHANGE_INSTRUMENT;	// change instr. button
+	set_green_led (&temp);
+	temp.pad_number = RESET_POS;			// reset position button
 	set_green_led (&temp);
 }
 
@@ -506,6 +511,7 @@ int pointer;
 int nb_chan;
 int nb_step;
 int i;
+int instrument;
 struct songstep temp_step;
 
 	// check if song exists by checking that song number is lower than number of songs
@@ -526,7 +532,9 @@ struct songstep temp_step;
 
 	// load instruments of the song to the corresponding channel
 	for (i = 0; i < nb_chan; i++) {
-		if (load_instrument (song [pointer++], i) == false) return false;
+		// set instrument number based on instrument specified in the song, and potential offset to change instrument
+		instrument = (song [pointer++] + instr_offset) % NB_INSTRUMENTS;
+		if (load_instrument (instrument, i) == false) return false;
 	}
 
 	// go through each step and light the corresponding pad
@@ -689,6 +697,12 @@ int main() {
 			if (!load_song (song_num)) error ();		// load new song according to song_num
 		}
 
+		// change instrument functionality
+		if (instr_pressed) {			// change instr pad has just been pressed
+			instr_offset++;				// increase instrument offset to change to next instr
+			if (!load_song (song_num)) error ();		// load current song again to reload the instruments
+			instr_pressed = false;
+		}
 
 		// in case some MIDI data is to be sent, then send it
 		if (index_tx) {
@@ -785,6 +799,14 @@ void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
 								// reset position functionality
 								if (buffer[i+1] == RESET_POS) {
 									reset_position (true);
+									reset_playback ();
+									i+=3;
+									break;
+								}
+
+								// change instrumentfunctionality
+								if (buffer[i+1] == CHANGE_INSTRUMENT) {
+									instr_pressed = true;
 									reset_playback ();
 									i+=3;
 									break;
