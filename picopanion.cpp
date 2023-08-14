@@ -694,6 +694,7 @@ int main() {
 		if (load_unpressed) {							// load pad has just been unpressed
 			load = false;
 			load_unpressed = false;
+			instr_offset = 0;							// song will be loaded with initial instruments
 			if (!load_song (song_num)) error ();		// load new song according to song_num
 		}
 
