@@ -31,8 +31,9 @@
 #include <math.h>
 #include "pico/stdlib.h"
 #include "pico/binary_info.h"
-#include "bsp/board.h"
+#include "bsp/board_api.h"
 #include "tusb.h"
+#include "usb_midi_host.h"
 
 #include "synth.hpp"
 #include "audio.hpp"
@@ -151,6 +152,7 @@ const uint32_t instruments[NB_INSTRUMENTS][7] = {
 
 
 // poll USB receive and process received bytes accordingly
+/*
 void poll_usb_rx ()
 {
 	// device must be attached and have at least one endpoint ready to receive a message
@@ -160,7 +162,7 @@ void poll_usb_rx ()
 	}
 	tuh_midi_read_poll(midi_dev_addr);
 }
-
+*/
 
 // write midi events stored in midi_tx buffer to midi out
 // returns true if data was actually sent, false if not
@@ -711,9 +713,11 @@ int main() {
 			send_midi ();
 		}
 
+/*
 		// read MIDI events coming from groovebox and manage accordingly
 		if (connected) tuh_midi_stream_flush(midi_dev_addr);
 		poll_usb_rx ();
+*/
 
     	// update audio buffer : make sure we do this regularly (in while loop)
 	   	update_buffer(ap, get_audio_frame);
