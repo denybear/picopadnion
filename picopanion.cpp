@@ -151,19 +151,6 @@ const uint32_t instruments[NB_INSTRUMENTS][7] = {
 
 
 
-// poll USB receive and process received bytes accordingly
-/*
-void poll_usb_rx ()
-{
-	// device must be attached and have at least one endpoint ready to receive a message
-	if (!connected || tuh_midih_get_num_rx_cables(midi_dev_addr) < 1)
-	{
-		return;
-	}
-	tuh_midi_read_poll(midi_dev_addr);
-}
-*/
-
 // write midi events stored in midi_tx buffer to midi out
 // returns true if data was actually sent, false if not
 bool send_midi (void)
@@ -323,16 +310,6 @@ void reset_leds ()
 	reset_launchpad ();
 	// set function leds in green
 	set_function_leds ();
-
-//	for (i = 0; i < 0x80; i+= 0x10) {
-//		for (j = 0; j < 0x08 ; j++) {
-//			// basically we just add the right midi command to outgoing midi flow
-//			// this is NOTE ON (pad number) (pad color)
-//			midi_tx [index_tx++] = 0x90;
-//			midi_tx [index_tx++] = (i + j);
-//			midi_tx [index_tx++] = 0x0C;	// led off
-//		}
-//	}
 }
 
 
@@ -713,11 +690,10 @@ int main() {
 			send_midi ();
 		}
 
-/*
+
 		// read MIDI events coming from groovebox and manage accordingly
 		if (connected) tuh_midi_stream_flush(midi_dev_addr);
-		poll_usb_rx ();
-*/
+
 
     	// update audio buffer : make sure we do this regularly (in while loop)
 	   	update_buffer(ap, get_audio_frame);

@@ -13,6 +13,7 @@ pico_sdk_init()
 #add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/midi_uart_lib)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/.. usb_midi_host)
 add_executable(${target_proj}
     picopanion.cpp
     audio.hpp
