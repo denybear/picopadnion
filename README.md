@@ -1,4 +1,4 @@
-# picopadnion
+# picopanion
 picopanion is a music box creating musical accompaniment for a live band.
 It uses a raspberry pico, a Novation Launchpad mini as UI (user interface) and [Pimironi's PICO AUDIO](https://shop.pimoroni.com/products/pico-audio-pack?variant=32369490853971) extension board.   
 This project heavily relies on [rpicomidi](https://github.com/rppicomidi) work, and in particular on its [MIDI host driver for tinyUSB](https://github.com/rppicomidi/usb_midi_host) which allows raspberry pico to become a USB MIDI host.   
